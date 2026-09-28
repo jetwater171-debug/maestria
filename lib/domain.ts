@@ -6,7 +6,7 @@ export type Line={productId:string;name:string;price:number;quantity:number;stat
 export type Order={id:string;tableId:string;session:string;lines:Line[];note:string;status:'new'|'preparing'|'ready'|'delivered'|'cancelled';createdAt:string;author:string};
 export type Payment={id:string;session:string;tableName:string;subtotal:number;service:number;discount:number;total:number;method:string;createdAt:string};
 export type Employee={id:string;name:string;role:Exclude<Role,'owner'>;active:boolean};
-export type State={printJobs?:PrintJob[];printer?:PrinterState;name:string;location:string;service:number;tables:Table[];products:Product[];orders:Order[];payments:Payment[];employees:Employee[];processed:string[]};
+export type State={phone?:string;printJobs?:PrintJob[];printer?:PrinterState;name:string;location:string;service:number;tables:Table[];products:Product[];orders:Order[];payments:Payment[];employees:Employee[];processed:string[]};
 export type Action={id:string;type:string;[key:string]:unknown};
 export const money=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 export const orderTotal=(o:Order)=>o.lines.reduce((s,l)=>s+l.price*l.quantity,0);
@@ -15,7 +15,11 @@ export const subtotal=(s:State,t:Table)=>tableOrders(s,t).reduce((v,o)=>v+orderT
 function str(v:unknown,max=100){if(typeof v!=='string'||!v.trim()||v.trim().length>max)throw Error('Preencha os campos corretamente.');return v.trim()}
 function int(v:unknown,min:number,max:number){if(typeof v!=='number'||!Number.isInteger(v)||v<min||v>max)throw Error('Confira os valores informados.');return v}
 const roles:Record<string,Role[]>={order:['owner','waiter'],status:['owner','kitchen','waiter'],closing:['owner','waiter','cashier'],reopen:['owner','cashier'],checkout:['owner','cashier'],product:['owner'],availability:['owner'],table:['owner'],settings:['owner'],employee:['owner'],revoke:['owner'],cancel:['owner'],printer:['owner'],reprint:['owner','kitchen'],printTest:['owner']};
-export function createState(name:string,location:string,count:number):State{return {name:str(name),location:location.slice(0,150),service:10,tables:Array.from({length:int(count,1,300)},(_,i)=>({id:crypto.randomUUID(),name:`Mesa ${String(i+1).padStart(2,'0')}`,area:'Areia',session:null,closing:false})),products:[],orders:[],payments:[],employees:[],processed:[]}}
+export function createState(name:string,location:string,count:number,options:{phone?:unknown;prefix?:unknown;start?:unknown;area?:unknown;service?:unknown}={}):State{
+ const prefix=options.prefix===undefined?'Mesa':str(options.prefix,30),start=options.start===undefined?1:int(options.start,1,9999),area=options.area===undefined?'Areia':str(options.area,40);
+ const phone=options.phone===undefined||options.phone===''?'':str(options.phone,25);
+ return {name:str(name),location:str(location||'Local a definir',150),phone,service:options.service===undefined?10:int(options.service,0,30),tables:Array.from({length:int(count,1,300)},(_,i)=>({id:crypto.randomUUID(),name:`${prefix} ${String(i+start).padStart(2,'0')}`,area,session:null,closing:false})),products:[],orders:[],payments:[],employees:[],processed:[]}}
+
 export function applyAction(state:State,a:Action,role:Role,author:string,now=new Date().toISOString()):State{
  if(!roles[a.type]?.includes(role))throw Error('Seu acesso não permite essa ação.');str(a.id,100);if(state.processed.includes(a.id))return state;
  const s=structuredClone(state);const table=()=>{const t=s.tables.find(x=>x.id===a.tableId);if(!t)throw Error('Mesa não encontrada.');return t};
@@ -28,7 +32,7 @@ export function applyAction(state:State,a:Action,role:Role,author:string,now=new
  case 'product':{if(!Array.isArray(a.products)||!a.products.length||a.products.length>200)throw Error('Confira os itens do cardápio.');for(const raw of a.products as Product[]){const p:Product={id:raw.id||crypto.randomUUID(),name:str(raw.name),category:str(raw.category,50),price:int(raw.price,1,10000000),description:typeof raw.description==='string'?raw.description.slice(0,300):'',available:raw.available!==false,station:raw.station==='bar'?'bar':'kitchen'};const i=s.products.findIndex(x=>x.id===p.id);if(i<0)s.products.push(p);else s.products[i]=p;}break}
  case 'availability':{const p=s.products.find(p=>p.id===a.productId);if(!p)throw Error('Item não encontrado.');p.available=a.available===true;break}
  case 'table':{const name=str(a.name,40);if(s.tables.some(t=>t.name.toLowerCase()===name.toLowerCase()&&t.id!==a.tableId))throw Error('Já existe uma mesa com esse nome.');if(a.tableId){const t=table();t.name=name;t.area=str(a.area,40)}else {if(s.tables.length>=300)throw Error('Limite de 300 mesas.');s.tables.push({id:a.id,name,area:str(a.area,40),session:null,closing:false})}break}
- case 'settings':s.name=str(a.name);s.location=str(a.location,150);s.service=int(a.service,0,30);break;
+ case 'settings':if(a.phone!==undefined)s.phone=a.phone===''?'':str(a.phone,25);s.name=str(a.name);s.location=str(a.location,150);s.service=int(a.service,0,30);break;
  case 'employee':{const r=a.role;if(!['waiter','kitchen','cashier'].includes(r as string))throw Error('Escolha uma função.');s.employees.push({id:a.id,name:str(a.name),role:r as Employee['role'],active:true});break}
  case 'revoke':{const e=s.employees.find(e=>e.id===a.employeeId);if(!e)throw Error('Funcionário não encontrado.');e.active=false;break}
  case 'printer':s.printer={...s.printer,enabled:a.enabled===true};break;
