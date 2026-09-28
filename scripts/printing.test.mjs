@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import {pollQueue,confirmPrint,ticket} from '../lib/printing.ts';
 import {scanRequest,parseScan} from '../lib/scanner.ts';
 import {createState,applyAction} from '../lib/domain.ts';
+import {androidPrintIntent} from '../lib/android-print.ts';
+import {gunzipSync} from 'node:zlib';
+test('ponte Android preserva comanda longa e escapa HTML antes de enviar',()=>{
+ const text='Camarão & água <script>alert(1)</script>\n'.repeat(150);
+ const uri=androidPrintIntent(text);
+ const payload=decodeURIComponent(uri.match(/S.content=([^;]+)/)[1]);
+ const pages=JSON.parse(gunzipSync(Buffer.from(payload,'base64')).toString());
+ assert.equal(pages.length,1);assert.match(pages[0],/Camarão &amp; água &lt;script&gt;/);
+ assert.ok(!pages[0].includes('<script>'));assert.match(uri,/package=com.farminos.print/);
+});
 const fixture=()=>[{id:'one',orderId:'o',content:'test',status:'queued',createdAt:new Date().toISOString()},{id:'two',orderId:'p',content:'test2',status:'queued',createdAt:new Date().toISOString()}];
 test('fila entrega uma comanda por vez e confirmação libera a próxima',()=>{const jobs=fixture();const d={enabled:true,statusCode:'200 OK'};assert.equal(pollQueue(jobs,d).jobToken,'one');assert.equal(pollQueue(jobs,d).jobReady,false);assert.equal(pollQueue(jobs,{...d,jobToken:'one'}).jobToken,'one');confirmPrint(jobs,'one','200 OK');confirmPrint(jobs,'one','200 OK');assert.equal(pollQueue(jobs,d).jobToken,'two')});
 test('sem papel e pausa não descartam comanda',()=>{const jobs=fixture();assert.equal(pollQueue(jobs,{enabled:true,statusCode:'410 Paper empty'}).jobReady,false);assert.equal(pollQueue(jobs,{enabled:false,statusCode:'200 OK'}).jobReady,false);assert.equal(jobs[0].status,'queued')});
