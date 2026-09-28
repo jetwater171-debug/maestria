@@ -1,8 +1,8 @@
 export const dynamic='force-dynamic';
 export function GET(){
  const read=(name:string)=>process.env[name]?.trim();
- const url=read('NEXT_PUBLIC_SUPABASE_URL');
- const key=read('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')||read('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+ const url=process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()||read('NEXT_PUBLIC_SUPABASE_URL');
+ const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()||process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()||read('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')||read('NEXT_PUBLIC_SUPABASE_ANON_KEY');
  const headers={'Cache-Control':'no-store'};
  const missing=[!url&&'NEXT_PUBLIC_SUPABASE_URL',!key&&'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'].filter(Boolean);
  if(missing.length)return Response.json({error:`Falta configurar na Vercel (Production): ${missing.join(', ')}. Salve e faça um novo deploy.`},{status:503,headers});
