@@ -1,8 +1,8 @@
 export type PrintJob={id:string;orderId:string;content:string;status:'queued'|'printing'|'printed'|'failed'|'uncertain';createdAt:string;claimedAt?:string;completedAt?:string;error?:string};
 export type PrinterState={enabled:boolean;lastSeen?:string;deviceStatus?:string};
-export function ticket(venue:string,table:string,order:{id:string;createdAt:string;author:string;note:string;lines:{name:string;quantity:number;station:string}[]},kind='NOVO PEDIDO'){
+export function ticket(venue:string,table:string,order:{id:string;createdAt:string;author:string;note:string;lines:{name:string;quantity:number;station:string;note?:string}[]},kind='NOVO PEDIDO'){
  const clean=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\x00-\x08\x0b-\x1f\x7f]/g,'');
- return clean([venue.toUpperCase(),kind,table.toUpperCase(),`#${order.id.slice(-8).toUpperCase()}`,new Date(order.createdAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),'--------------------------------',...order.lines.map(l=>`${l.quantity}x ${l.name}\n   ${l.station==='bar'?'BAR':'COZINHA'}`),'--------------------------------',order.note?`OBS: ${order.note}`:'',`Atendimento: ${order.author}`,'COMANDA NAO FISCAL','\n\n'].join('\n'));
+ return clean([venue.toUpperCase(),kind,table.toUpperCase(),`#${order.id.slice(-8).toUpperCase()}`,new Date(order.createdAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),'--------------------------------',...order.lines.map(l=>`${l.quantity}x ${l.name}${l.note?'\n   OBS: '+l.note:''}\n   ${l.station==='bar'?'BAR':'COZINHA'}`),'--------------------------------',order.note?`OBS: ${order.note}`:'',`Atendimento: ${order.author}`,'COMANDA NAO FISCAL','\n\n'].join('\n'));
 }
 export function pollQueue(jobs:PrintJob[],device:{enabled:boolean;printingInProgress?:boolean;jobToken?:string;statusCode?:string},now=new Date().toISOString()){
  const active=jobs.find(j=>j.status==='printing');
