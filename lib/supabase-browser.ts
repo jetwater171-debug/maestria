@@ -1,7 +1,11 @@
-import {createClient, type SupabaseClient} from '@supabase/supabase-js';
-let client:SupabaseClient|undefined;
-export function browserAuth(){
- const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
- if(!url||!key)throw Error('O acesso ainda não foi configurado. Configure o Supabase no servidor.');
- return client ||= createClient(url,key);
-}
+import {createClient, type SupabaseClient} from '@supabase/supabase-js';
+let pending:Promise<SupabaseClient>|undefined;
+export function browserAuth():Promise<SupabaseClient>{
+ return pending ||= (async()=>{
+  const response=await fetch('/api/auth-config',{cache:'no-store'});
+  const config=await response.json() as {url:string;key:string;error?:string};
+  if(!response.ok)throw Error(config.error||'Falha ao carregar acesso.');
+  return createClient(config.url,config.key);
+ })().catch(error=>{pending=undefined;throw error});
+}
+

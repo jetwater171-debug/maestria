@@ -10,7 +10,7 @@ export default function AuthScreen({recovery=false}:{recovery?:boolean}){
 
  const [mode,setMode]=useState(recovery?'update':'login'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
 
- async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{const client=browserAuth();
+ async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{const client=await browserAuth();
 
  if(mode==='forgot'){const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/redefinir'});if(error)throw error;setMessage('Se houver uma conta com este e-mail, você receberá as instruções.');return}
 
