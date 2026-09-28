@@ -28,3 +28,15 @@ Dados anteriores do D1 NÃO são migrados automaticamente. O estado por barraca 
 
 Não considerar produção aprovada só pelo build: testar no domínio publicado com Supabase real e dois aparelhos. Nunca usar os antigos testes HTTP D1 como comprovação de integração Supabase.
 
+## TC-163 — impressão automática com a cozinha aberta
+
+Pareie a impressora Bluetooth Classic/SPP nas configurações do aparelho. Abra a Cozinha no Chrome atualizado do Android (138+) ou no Chrome/Edge do notebook. Toque em **Conectar impressora**, escolha a TC-163 e depois **Ativar**. Não é necessário aplicativo auxiliar nesses navegadores com `navigator.serial` disponível.
+
+O navegador envia ESC/POS para papel de 58 mm. A conexão exige HTTPS (localhost também funciona). A cozinha precisa permanecer aberta e visível; recarregar a página ou sair da cozinha exige ativar novamente. Safari/iPhone não oferece essa conexão: para iPhone, use uma impressora de rede CloudPRNT previamente configurada, ou mantenha um Android/notebook como terminal de impressão.
+
+A fila autenticada `/api/local-print` reserva cada comanda com atualização condicional por versão, evitando dois terminais imprimirem a mesma via. Só pedidos posteriores à primeira ativação da tela são enviados automaticamente. Pausar/retomar preserva os pendentes dessa ativação. A impressão manual com conexão serial também reserva a comanda. CloudPRNT deve estar pausado para usar esta fila local.
+
+Envio por Bluetooth termina como **Enviada por Bluetooth**, sem afirmar saída física do papel. Falha ou ausência de confirmação gera **Verificar impressão**; não há repetição automática de uma comanda incerta. Confira o papel e use **Reimprimir** para gerar uma nova via identificada. Foram feitos testes automatizados da fila, do formato ESC/POS e um teste no navegador com transporte simulado; a validação física da TC-163 permanece necessária.
+
+Suporte Android confirmado nas [notas oficiais do Chrome 138](https://developer.chrome.com/release-notes/138#web_serial_over_bluetooth_on_android).
+

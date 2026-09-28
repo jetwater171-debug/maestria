@@ -5,6 +5,29 @@ import {scanRequest,parseScan} from '../lib/scanner.ts';
 import {createState,applyAction} from '../lib/domain.ts';
 import {androidPrintIntent} from '../lib/android-print.ts';
 import {gunzipSync} from 'node:zlib';
+import {claimLocalJob,finishLocalJob} from '../lib/local-print-queue.ts';
+import {escposBytes} from '../lib/kitchen-printer.ts';
+test('Bluetooth reserva global impede duas cozinhas de enviar a mesma comanda',()=>{
+ const jobs=fixture();const since='2000-01-01T00:00:00Z';
+ const claimed=claimLocalJob(jobs,'android','token',since);assert.equal(claimed.id,'one');
+ assert.equal(claimLocalJob(jobs,'notebook','other',since),null);
+ assert.throws(()=>finishLocalJob(jobs,'notebook','other','one',true));
+ finishLocalJob(jobs,'android','token','one',true);assert.equal(jobs[0].status,'sent');
+ assert.equal(claimLocalJob(jobs,'notebook','other',since).id,'two');
+});
+test('Bluetooth não imprime histórico ao ativar nem repete envio sem confirmação',()=>{
+ const jobs=fixture();assert.equal(claimLocalJob(jobs,'a','t','2099-01-01T00:00:00Z'),null);
+ claimLocalJob(jobs,'a','t','2000-01-01T00:00:00Z','2026-01-01T00:00:00Z');
+ assert.equal(claimLocalJob(jobs,'a','t','2000-01-01T00:00:00Z','2026-01-01T00:02:00Z'),null);
+ assert.equal(jobs[0].status,'uncertain');
+ finishLocalJob(jobs,'a','t','one',false);assert.equal(jobs[0].status,'uncertain');
+});
+test('ESC/POS inicializa impressora, preserva fim de comanda e remove comandos injetados',()=>{
+ const bytes=escposBytes('Camarão\n'+('x'.repeat(100))+'\n\x1b\x40');
+ assert.deepEqual([...bytes.slice(0,5)],[27,64,27,97,0]);
+ const body=new TextDecoder().decode(bytes.slice(5));assert.match(body,/Camarao/);assert.ok(body.endsWith('\n\n\n'));assert.ok(!body.includes('\x1b'));
+ assert.ok(body.split('\n').every(line=>line.length<=32));
+});
 test('ponte Android preserva comanda longa e escapa HTML antes de enviar',()=>{
  const text='Camarão & água <script>alert(1)</script>\n'.repeat(150);
  const uri=androidPrintIntent(text);
