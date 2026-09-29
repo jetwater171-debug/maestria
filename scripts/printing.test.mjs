@@ -5,6 +5,21 @@ import {scanRequest,parseScan} from '../lib/scanner.ts';
 import {createState,applyAction} from '../lib/domain.ts';
 import {androidPrintIntent} from '../lib/android-print.ts';
 import {gunzipSync} from 'node:zlib';
+import {connectBlePrinter,disconnectBlePrinter,bleAvailable,bleDiagnostic,bleUuid,BLE_PROFILES} from '../lib/ble-printer.ts';
+import {printKitchenReceipt} from '../lib/kitchen-printer.ts';
+
+test('BLE iPhone descobre canal autorizado, envia ESC/POS em blocos e limpa desconexão',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');const writes=[];let disconnected=0;const profile=BLE_PROFILES[0];
+ const characteristic={uuid:profile.characteristic,properties:{writeWithoutResponse:true},writeValueWithoutResponse:async bytes=>writes.push([...bytes])};
+ const device={name:'TC-163 teste',gatt:{connected:true,connect:async()=>({getPrimaryServices:async()=>[{uuid:profile.service,getCharacteristics:async()=>[characteristic]}]}),disconnect:()=>{device.gatt.connected=false;disconnected++}},addEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async options=>{assert.equal(options.acceptAllDevices,true);assert.ok(options.optionalServices.includes(profile.service));return device}}}});
+ try{await connectBlePrinter();assert.equal(bleAvailable(),true);assert.match(bleDiagnostic(),/TC-163 teste/);await printKitchenReceipt('test','Pedido de teste com texto maior que vinte caracteres');assert.ok(writes.every(b=>b.length<=20));assert.deepEqual(writes.flat(),[...escposBytes('Pedido de teste com texto maior que vinte caracteres')]);await disconnectBlePrinter();assert.equal(bleAvailable(),false);assert.equal(disconnected,1)}finally{await disconnectBlePrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}
+});
+test('BLE não envia comandos a canal desconhecido e rejeita UUID inválido antes do seletor',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');let writes=0,requests=0;const device={gatt:{connected:true,connect:async()=>({getPrimaryServices:async()=>[{uuid:BLE_PROFILES[0].service,getCharacteristics:async()=>[{uuid:'00001234-0000-1000-8000-00805f9b34fb',properties:{write:true},writeValue:async()=>{writes++}}]}]}),disconnect:()=>{}},addEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>{requests++;return device}}}});
+ try{await assert.rejects(connectBlePrinter(),/canal de impressão/);assert.equal(writes,0);assert.equal(bleAvailable(),false);await assert.rejects(connectBlePrinter({service:'bad uuid',characteristic:'ff02'}),/UUID inválido/);assert.equal(requests,1);assert.equal(bleUuid('FF00'),'0000ff00-0000-1000-8000-00805f9b34fb')}finally{if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}
+});
 import {claimLocalJob,finishLocalJob} from '../lib/local-print-queue.ts';
 import {escposBytes,printerPlatform,printerConnectionError,connectKitchenPrinter,disconnectKitchenPrinter,printerAvailable} from '../lib/kitchen-printer.ts';
 test('Bluetooth reserva global impede duas cozinhas de enviar a mesma comanda',()=>{
