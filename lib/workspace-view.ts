@@ -1,0 +1,2 @@
+import type {State,Role} from './domain';
+export function publicWorkspace(state:State|null,role:Role){if(!state)return null;const {saas,...publicState}=state;void saas;return {...publicState,processed:[],employees:role==='owner'?state.employees:[],payments:role==='owner'||role==='cashier'?state.payments:[],orders:role==='owner'?state.orders:state.orders.filter(o=>state.tables.some(t=>t.session===o.session))}}

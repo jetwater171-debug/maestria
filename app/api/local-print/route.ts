@@ -1,3 +1,4 @@
+import {assertSubscription} from '@/lib/saas-billing';
 import {resolveAccess} from '@/lib/access';
 import {readVenue,saveVenue} from '@/lib/db';
 import {claimLocalJob,finishLocalJob} from '@/lib/local-print-queue';
@@ -13,7 +14,7 @@ export async function POST(req:Request){
   if(b.type==='claim'&&(!b.since||!Number.isFinite(Date.parse(b.since))||Date.parse(b.since)>Date.now()+30000))throw Error('Horário inválido.');
   for(let i=0;i<5;i++){
    const row=await readVenue(access.owner);if(!row)throw Error('Barraca não encontrada.');
-   const state=row.state;
+   const state=row.state;assertSubscription(state.saas);
    if(state.printer?.enabled)throw Error('Pause a impressão Star CloudPRNT antes de usar Bluetooth.');
    const previous=JSON.stringify(state.printJobs);let job=null;
    if(b.type==='claim')job=claimLocalJob(state.printJobs||[],b.deviceId,b.claimToken,b.since!,undefined,b.jobId);

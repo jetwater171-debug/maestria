@@ -8,7 +8,7 @@ export type Payment={id:string;session:string;tableName:string;subtotal:number;s
 export type Employee={id:string;name:string;role:Exclude<Role,'owner'>;active:boolean};
 export type VenueProfile={kind:string;address:string;reference:string;hours:string;instagram:string};
 export type StockMovement={id:string;productId:string;quantity:number;reason:string;createdAt:string;author:string};
-export type State={stockMovements?:StockMovement[];settlements?:Record<string,{subtotal:number;service:number;discount:number;total:number}>;profile?:VenueProfile;phone?:string;printJobs?:PrintJob[];printer?:PrinterState;name:string;location:string;service:number;tables:Table[];products:Product[];orders:Order[];payments:Payment[];employees:Employee[];processed:string[]};
+export type State={saas?:import('./saas-billing').SaaSAccount;stockMovements?:StockMovement[];settlements?:Record<string,{subtotal:number;service:number;discount:number;total:number}>;profile?:VenueProfile;phone?:string;printJobs?:PrintJob[];printer?:PrinterState;name:string;location:string;service:number;tables:Table[];products:Product[];orders:Order[];payments:Payment[];employees:Employee[];processed:string[]};
 export type Action={id:string;type:string;[key:string]:unknown};
 export const money=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 export const orderTotal=(o:Order)=>o.lines.reduce((s,l)=>s+l.price*l.quantity,0);

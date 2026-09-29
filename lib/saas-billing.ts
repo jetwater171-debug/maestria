@@ -1,0 +1,24 @@
+export type SubscriptionStatus='trial'|'active'|'paused'|'cancelled';
+export type Invoice={id:string;period:string;description:string;amount:number;dueDate:string;status:'pending'|'paid'|'void';createdAt:string;paidAt?:string;method?:string;receipt?:string};
+export type SaaSAccount={plan:string;monthlyFee:number;billingDay:number;status:SubscriptionStatus;trialUntil:string;notes:string;invoices:Invoice[];audit:{id:string;at:string;actor:string;action:string}[];processed:string[]};
+export type BillingAction={id:string;type:string;[key:string]:unknown};
+export function accountDefaults(raw?:Partial<SaaSAccount>):SaaSAccount{return {plan:'Sem plano definido',monthlyFee:0,billingDay:5,status:'trial',trialUntil:'',notes:'',invoices:[],audit:[],processed:[],...raw}}
+function text(v:unknown,max:number,required=false){if(typeof v!=='string'||v.length>max||(required&&!v.trim()))throw Error('Confira os campos informados.');return v.trim()}
+function cents(v:unknown,min=0){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<min||v>100000000)throw Error('Confira o valor em reais.');return v}
+function date(v:unknown){const value=text(v,10,true);if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+'T12:00:00Z'))||new Date(value+'T12:00:00Z').toISOString().slice(0,10)!==value)throw Error('Data inválida.');return value}
+export function invoiceStatus(i:Invoice,today=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})){return i.status==='pending'&&i.dueDate<today?'overdue':i.status}
+export function canAdmin(userId:string,configured:string){return !!userId&&configured.split(',').map(v=>v.trim()).filter(Boolean).includes(userId)}
+export function assertSubscription(raw?:Partial<SaaSAccount>){if(raw?.status==='paused'||raw?.status==='cancelled')throw Error('O acesso da barraca está pausado. Fale com o suporte Maestria para reativar.');}
+export function applyBilling(raw:Partial<SaaSAccount>|undefined,a:BillingAction,actor:string,now=new Date().toISOString()):SaaSAccount{
+ const s=structuredClone(accountDefaults(raw));text(a.id,100,true);if(s.processed.includes(a.id))return s;let summary='';
+ switch(a.type){
+ case 'subscription':{s.plan=text(a.plan,80,true);s.monthlyFee=cents(a.monthlyFee);if(typeof a.billingDay!=='number'||!Number.isInteger(a.billingDay)||a.billingDay<1||a.billingDay>28)throw Error('Escolha um vencimento entre os dias 1 e 28.');s.billingDay=a.billingDay;if(!['trial','active','paused','cancelled'].includes(String(a.status)))throw Error('Status inválido.');s.status=a.status as SubscriptionStatus;s.trialUntil=a.trialUntil?date(a.trialUntil):'';s.notes=text(a.notes,3000);summary=`Assinatura: ${s.plan}, ${s.status}, mensalidade ${s.monthlyFee} centavos`;break}
+ case 'generate':{const period=text(a.period,7,true);if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))throw Error('Escolha o mês da cobrança.');if(s.status!=='active'||s.monthlyFee<=0)throw Error('Defina uma assinatura ativa com mensalidade antes de gerar.');if(s.invoices.some(i=>i.id==='monthly:'+period))return s;s.invoices.push({id:'monthly:'+period,period,description:`${s.plan} · ${period}`,amount:s.monthlyFee,dueDate:`${period}-${String(s.billingDay).padStart(2,'0')}`,status:'pending',createdAt:now});summary=`Mensalidade gerada: ${period}`;break}
+ case 'invoice':{const description=text(a.description,160,true),amount=cents(a.amount,1),dueDate=date(a.dueDate);s.invoices.push({id:a.id,period:dueDate.slice(0,7),description,amount,dueDate,status:'pending',createdAt:now});summary=`Cobrança avulsa criada: ${description}`;break}
+ case 'paid':{const i=s.invoices.find(i=>i.id===a.invoiceId);if(!i||i.status!=='pending')throw Error('Esta cobrança não está pendente.');const method=text(a.method,40,true);if(!['Pix','Dinheiro','Transferência','Cartão','Outro'].includes(method))throw Error('Escolha a forma de pagamento.');const paidAt=date(a.paidAt);if(paidAt>now.slice(0,10))throw Error('Não registre pagamento em uma data futura.');i.status='paid';i.paidAt=paidAt;i.method=method;i.receipt=text(a.receipt,500);summary=`Recebimento manual confirmado: ${i.description}, ${method}, ${i.amount} centavos`;break}
+ case 'void':case 'reopen':{const i=s.invoices.find(i=>i.id===a.invoiceId);if(!i||a.type==='void'&&i.status!=='pending'||a.type==='reopen'&&i.status!=='paid')throw Error('Confira o status da cobrança.');const reason=text(a.reason,500,true);i.status=a.type==='void'?'void':'pending';if(a.type==='reopen'){delete i.paidAt;delete i.method;delete i.receipt}summary=`${a.type==='void'?'Cobrança cancelada':'Recebimento revertido'}: ${i.description}. Motivo: ${reason}`;break}
+ default:throw Error('Ação inválida.');
+ }
+ s.processed.push(a.id);s.audit.push({id:a.id,at:now,actor,action:summary});return s
+}
+export function csvCell(value:unknown){const text=String(value??'');return '"'+(/^[\s]*[=+@\-]/.test(text)?"'":'')+text.replaceAll('"','""')+'"'}
