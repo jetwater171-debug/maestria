@@ -229,3 +229,68 @@ html:has(.lp){scroll-behavior:smooth}
 @keyframes lp-settle{from{transform:translateY(12px)}to{transform:translateY(0)}}
 @media(max-width:360px){.lp-demo-screen-heading h4{white-space:nowrap;font-size:25px}.lp-demo-status{font-size:8px;max-width:87px}}
 @media(prefers-reduced-motion:reduce){.lp-hero-copy>h1,.lp-hero-copy>p,.lp-hero-buttons{animation:none}}
+
+/* Compact sales page: benefits first, fewer sections and no floating CTA. */
+.lp-compact .lp-entry{display:flex;align-items:center;gap:8px;font-size:13px;min-height:44px;padding:8px 17px;border:1px solid #d6dfd5;border-radius:40px}
+.lp-compact .lp-hero{padding-top:42px}
+.lp-compact h1{font-size:clamp(58px,6.2vw,84px)}
+.lp-compact .lp-hero-points{margin-bottom:26px}
+.lp-compact .lp-hero-visual{height:260px}
+.lp-compact .lp-image-label{top:57px;font-size:34px}
+.lp-compact .lp-hero-visual .lp-phone{bottom:-190px;transform:translateX(-50%) rotate(8deg) scale(.68)}
+.lp-compact .lp-floating-note{top:37px;right:26%}
+.lp-compact .lp-visual-caption{bottom:27px}
+.lp-compact .lp-section{padding-block:65px}
+.lp-compact .lp-benefit-grid{margin-top:28px}
+.lp-compact .lp-benefit{position:relative;padding:23px 22px 23px 58px!important}
+.lp-compact .lp-benefit-icon{position:absolute;left:0;top:24px;width:39px;height:39px}
+.lp-compact .lp-benefit h3{font-size:17px;letter-spacing:-.4px}
+.lp-compact .lp-benefit p{font-size:13px;line-height:1.75;margin-top:8px}
+.lp-quick-start{display:flex;align-items:center;gap:16px;padding:20px 24px;background:#f0eee1;border-radius:12px;margin-top:9px;color:#58654e}
+.lp-quick-start p{font-size:13px;line-height:1.7}.lp-quick-start strong{color:#3a5348}
+.lp-compact .lp-demo{margin-top:28px}
+.lp-compact .lp-demo-copy>p,.lp-compact .lp-demo-copy>.lp-eyebrow{display:none}
+.lp-compact .lp-demo-copy h3{font-size:32px}
+.lp-compact .lp-demo-body{padding:30px 40px;gap:40px}
+.lp-compact .lp-demo-screen{min-height:0}
+.lp-compact .lp-demo-copy>small{margin-top:12px}
+.lp-compact .lp-faq{gap:70px}
+.lp-compact .lp-faq h2{font-size:40px}
+.lp-compact .lp-closing{padding:44px 55px;margin-bottom:40px}
+.lp-compact .lp-closing h2{font-size:42px}
+.lp-compact .lp-closing p{margin:18px 0 24px}
+.lp-compact .lp-footer{padding-bottom:25px}
+@media(max-width:800px){
+ .lp-compact .lp-demo-body{padding:24px;gap:22px}
+ .lp-compact .lp-hero-visual .lp-phone{bottom:-206px}
+ .lp-compact .lp-benefit{padding-right:18px!important}
+}
+@media(max-width:600px){
+ .lp-compact .lp-nav{height:64px}.lp-compact .lp-entry{font-size:12px;padding:8px 14px}
+ .lp-compact .lp-hero{padding-top:28px}.lp-compact .lp-hero-eyebrow{margin-bottom:16px}
+ .lp-compact h1{font-size:clamp(46px,12.5vw,68px)}
+ .lp-compact .lp-hero-copy>p{margin-top:15px;font-size:14px;line-height:1.7}
+ .lp-compact .lp-hero-buttons{margin-top:20px;gap:6px}.lp-compact .lp-hero-points{margin:7px 0 21px}
+ .lp-compact .lp-hero-visual{height:218px}.lp-compact .lp-image-label{font-size:23px;top:24px;max-width:160px;left:20px}
+ .lp-compact .lp-image-label em{font-size:22px}.lp-compact .lp-image-label>svg{display:none}
+ .lp-compact .lp-hero-visual .lp-phone{bottom:-235px;right:-79px;transform:rotate(8deg) scale(.48)}
+ .lp-compact .lp-floating-note{top:100px;right:14px;padding:9px 11px}.lp-compact .lp-floating-note small{display:none}
+ .lp-compact .lp-visual-caption{left:20px;bottom:20px;font-size:6px;max-width:115px}
+ .lp-compact .lp-section{padding-block:45px}.lp-compact h2{font-size:31px;line-height:1.2}
+ .lp-compact .lp-eyebrow{font-size:8px;margin-bottom:13px}
+ .lp-compact .lp-benefit-grid{margin-top:23px}
+ .lp-compact .lp-benefit,.lp-compact .lp-benefit:nth-child(even){padding:17px 0 17px 52px!important}
+ .lp-compact .lp-benefit-icon{top:19px;width:35px;height:35px}.lp-compact .lp-benefit-icon svg{width:18px}
+ .lp-compact .lp-benefit h3{font-size:16px}.lp-compact .lp-benefit p{font-size:13px;line-height:1.7;margin-top:5px}
+ .lp-quick-start{padding:17px 15px;gap:12px;align-items:flex-start;margin-top:7px}.lp-quick-start p{font-size:12px;line-height:1.7}.lp-quick-start strong{display:block}
+ .lp-compact .lp-section-title>p{font-size:13px;margin-top:13px}
+ .lp-compact .lp-demo-body{padding:18px 12px 12px;gap:16px}.lp-compact .lp-demo-copy h3{font-size:23px;max-width:none}
+ .lp-compact .lp-demo-tip{display:none}.lp-compact .lp-demo-copy>small{margin-top:8px;font-size:9px}
+ .lp-compact .lp-demo-tabs>button{min-height:58px;padding-block:9px}
+ .lp-compact .lp-demo-screen-inner{padding:15px 12px}.lp-compact .lp-demo-screen-heading{margin-bottom:12px}
+ .lp-compact .lp-faq{gap:20px}.lp-compact .lp-faq h2{font-size:31px}
+ .lp-compact .lp-faq-list summary{font-size:13px;padding:17px 0;min-height:60px}
+ .lp-compact .lp-closing{padding:29px 23px;margin-bottom:30px}.lp-compact .lp-closing h2{font-size:30px}
+ .lp-compact .lp-closing p{font-size:13px;margin:15px 0 20px}.lp-compact .lp-closing .lp-eyebrow{max-width:none;font-size:7px}
+ .lp-compact .lp-footer{gap:17px;padding-bottom:22px}.lp-compact .lp-footer-bottom{margin-top:0}
+}

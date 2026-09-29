@@ -28,8 +28,13 @@ Prompt utilizado:
 
 - Abertura centralizada “Praia cheia. Operação leve.”, panorama da praia e demonstração em três etapas.
 - Seis benefícios agrupam a operação; botões maiores e textos mais legíveis em telas pequenas.
-- O CTA móvel aparece após o hero e desaparece na chamada final ou ao abrir o menu. Fora desses momentos fica inerte, sem entrar na navegação por teclado.
+- A versão compacta não usa CTA fixo nem menu expansível: o cabeçalho oferece Entrar e a abertura oferece o cadastro e a demonstração.
 - Links para o painel usam `prefetch={false}`: a página comercial não antecipa o download da aplicação operacional.
 - Animações usam transform/opacity e IntersectionObserver, sem bibliotecas de animação ou handlers de scroll. O scanner pausa fora da tela. Reduced motion e economia de dados desativam efeitos.
 - A foto original foi redimensionada para 1280 × 853 e comprimida em WebP (`public/images/maestria-praia-light.webp`, 141.068 bytes). Next Image entrega tamanhos adaptados à tela. O original continua preservado.
 - Não há promessa de desempenho em todo aparelho; verificar carregamento e interações em aparelhos reais conforme a base de clientes crescer.
+
+
+## Versão compacta
+
+Cinco seções: abertura, benefícios, demonstração, três dúvidas essenciais e cadastro. Removidas as seções redundantes de problemas, faixa de recursos, scanner e configuração; scanner e primeiros passos continuam explicados em blocos curtos. Benefícios aparecem antes da demonstração. No viewport de 390 × 844, a altura caiu de 7.752 para 3.481 px (55%). Demonstração e largura de 320 px verificadas no navegador.
