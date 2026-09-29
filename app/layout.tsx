@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./beach.css";
+import "./mobile-polish.css";
 
 export const metadata: Metadata = {
   title: "Maestria Beach • Sua barraca sob controle",
