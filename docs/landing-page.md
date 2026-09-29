@@ -22,3 +22,14 @@ gerada para a marca, e não representa uma barraca cliente.
 Prompt utilizado:
 
 > Create a photorealistic premium editorial travel photograph for a Brazilian beach restaurant software website. Wide landscape 3:2 image. Elevated slightly overhead diagonal view of a beautiful Brazilian beach kiosk seating area, warm pale sand, three natural ivory canvas beach umbrellas and simple wooden tables, a few understated navy blue cushions. Turquoise ocean with foamy surf in the upper third and natural rich teal gradients. One palm frond enters from upper right foreground, subtle elegant shadows on sunlit sand. Warm late morning natural sunlight, analog film aesthetic, fine natural grain, sophisticated travel magazine photography, real textures, restrained colors, peaceful organized scene with spacious composition. No text, no logo, no watermarks, no people, no buildings, no screens or devices. The bottom center foreground should have mostly clear warm sand to allow website interface overlays. Not an illustration or 3D render.
+
+
+## Refinamento editorial e desempenho
+
+- Abertura centralizada “Praia cheia. Operação leve.”, panorama da praia e demonstração em três etapas.
+- Seis benefícios agrupam a operação; botões maiores e textos mais legíveis em telas pequenas.
+- O CTA móvel aparece após o hero e desaparece na chamada final ou ao abrir o menu. Fora desses momentos fica inerte, sem entrar na navegação por teclado.
+- Links para o painel usam `prefetch={false}`: a página comercial não antecipa o download da aplicação operacional.
+- Animações usam transform/opacity e IntersectionObserver, sem bibliotecas de animação ou handlers de scroll. O scanner pausa fora da tela. Reduced motion e economia de dados desativam efeitos.
+- A foto original foi redimensionada para 1280 × 853 e comprimida em WebP (`public/images/maestria-praia-light.webp`, 141.068 bytes). Next Image entrega tamanhos adaptados à tela. O original continua preservado.
+- Não há promessa de desempenho em todo aparelho; verificar carregamento e interações em aparelhos reais conforme a base de clientes crescer.
