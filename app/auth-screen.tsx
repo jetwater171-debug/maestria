@@ -6,19 +6,19 @@ import {Waves,ArrowRight} from 'lucide-react';
 
 import {browserAuth} from '@/lib/supabase-browser';
 
-export default function AuthScreen({recovery=false}:{recovery?:boolean}){
+export default function AuthScreen({recovery=false,initialSignup=false}:{recovery?:boolean;initialSignup?:boolean}){
 
- const [mode,setMode]=useState(recovery?'update':'login'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ const [mode,setMode]=useState(recovery?'update':initialSignup?'signup':'login'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
 
  async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{const client=await browserAuth();
 
  if(mode==='forgot'){const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/redefinir'});if(error)throw error;setMessage('Se houver uma conta com este e-mail, você receberá as instruções.');return}
 
- if(mode==='update'){await client.auth.getSession();const {error}=await client.auth.updateUser({password});if(error)throw error;location.assign('/');return}
+ if(mode==='update'){await client.auth.getSession();const {error}=await client.auth.updateUser({password});if(error)throw error;location.assign('/painel');return}
 
- const {data,error}=mode==='signup'?await client.auth.signUp({email,password,options:{emailRedirectTo:location.origin}}):await client.auth.signInWithPassword({email,password});if(error)throw error;
+ const {data,error}=mode==='signup'?await client.auth.signUp({email,password,options:{emailRedirectTo:location.origin+'/painel'}}):await client.auth.signInWithPassword({email,password});if(error)throw error;
 
- if(data.session)location.assign('/');else setMessage('Confira seu e-mail para confirmar o cadastro. Depois entre com sua senha.');
+ if(data.session)location.assign('/painel');else setMessage('Confira seu e-mail para confirmar o cadastro. Depois entre com sua senha.');
 
  }catch(e){const msg=(e as Error).message;setMessage(msg.includes('Invalid login')?'E-mail ou senha incorretos.':msg.includes('Email not confirmed')?'Confirme seu e-mail antes de entrar.':msg.includes('rate limit')?'Muitas tentativas. Aguarde alguns minutos.':msg.includes('configurad')?msg:'Não foi possível concluir. Confira os dados e tente novamente.')}finally{setBusy(false)}}
 
