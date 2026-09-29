@@ -1,0 +1,6 @@
+const CACHE='maestria-shell-v1';
+self.addEventListener('install',event=>{event.waitUntil((async()=>{const cache=await caches.open(CACHE),response=await fetch('/');await cache.put('/',response.clone());const html=await response.text(),assets=[...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"]+)"/g)].map(m=>m[1]))];await cache.addAll(assets)})());self.skipWaiting()});
+self.addEventListener('activate',event=>{event.waitUntil(self.clients.claim())});
+self.addEventListener('fetch',event=>{const request=event.request,url=new URL(request.url);if(request.method!=='GET'||url.origin!==self.location.origin||url.pathname.startsWith('/api/')||request.headers.has('RSC')||url.searchParams.has('_rsc'))return;
+ const shell=request.mode==='navigate'&&url.pathname==='/',asset=url.pathname.startsWith('/_next/static/')||url.pathname.startsWith('/fonts/')||url.pathname==='/favicon.svg';if(!shell&&!asset)return;
+ event.respondWith((async()=>{const cache=await caches.open(CACHE);try{const response=await fetch(request);if(response.ok)await cache.put(shell?'/':request,response.clone());return response}catch(error){const cached=await cache.match(shell?'/':request);if(cached)return cached;throw error}})())});
