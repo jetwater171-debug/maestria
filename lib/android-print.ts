@@ -11,3 +11,13 @@ export function androidPrintIntent(content:string){
  let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);
  return `intent://#Intent;scheme=print-intent;package=com.farminos.print;S.content=${encodeURIComponent(btoa(binary))};S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.farminos.print')};end`;
 }
+
+// Official RawBT URI contract: rawbt:base64,<raw ESC/POS bytes>.
+// The app handles Bluetooth Classic; the browser only opens an external link.
+export function rawBtLink(content:string){
+ const clean=content.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e\n]/g,'');
+ const wrapped=clean.split('\n').flatMap(line=>line.match(/.{1,32}/g)||['']).join('\n');
+ const bytes=new Uint8Array([27,64,27,97,0,...new TextEncoder().encode(wrapped+'\n\n\n')]);
+ let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);
+ return 'rawbt:base64,'+btoa(binary);
+}

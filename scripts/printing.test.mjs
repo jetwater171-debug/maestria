@@ -61,3 +61,92 @@ test('scanner usa exclusivamente modelo escolhido e esquema multimodal LLM7',()=
 
 test('iPhone e iPad são identificados sem confundir MacBook',()=>{assert.equal(printerPlatform('iPhone'),'ios');assert.equal(printerPlatform('Macintosh',5),'ios');assert.equal(printerPlatform('Macintosh',0),'desktop');assert.equal(printerPlatform('Android Chrome/138'),'android');assert.match(printerConnectionError({name:'NotFoundError'}),/lista ficou vazia/);assert.match(printerConnectionError({name:'NetworkError'}),/notebook/)});
 test('seletor usa SPP padrão, reconecta porta autorizada e limpa conexão ao sair',async()=>{const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');let chooser=0,opens=0,closed=0;const p={writable:{locked:false},open:async()=>{opens++},close:async()=>{closed++},addEventListener:()=>{}};Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{getPorts:async()=>[p],requestPort:async(...args)=>{assert.equal(args.length,0);chooser++;return p}}}});try{await connectKitchenPrinter();assert.equal(chooser,0);assert.equal(opens,1);assert.equal(printerAvailable(),true);await disconnectKitchenPrinter();assert.equal(closed,1);await connectKitchenPrinter(false);assert.equal(chooser,1);await disconnectKitchenPrinter()}finally{if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}});
+
+import {printScope,canPrintJob,copyPrintJob} from '../lib/print-access.ts';
+import {publicWorkspace} from '../lib/workspace-view.ts';
+import {rawBtLink} from '../lib/android-print.ts';
+function portableFixture(){let s=createState('Praia','Praia',2);s.products=[{id:'water',name:'Água',category:'Bebidas',price:500,description:'',available:true,station:'bar'}];s=applyAction(s,{id:'mode',type:'printer',mode:'waiter'},'owner','Dono');return s}
+function orderFor(s,id,employeeId){return applyAction(s,{id,type:'order',tableId:s.tables[0].id,items:[{productId:'water',quantity:1}],employeeId:'forged',destination:'kitchen'},'waiter','Mesmo nome',undefined,employeeId)}
+test('dono escolhe destino; garçom não muda configuração nem forja autoria de impressão',()=>{
+ const s=portableFixture();assert.equal(s.printer.mode,'waiter');assert.equal(s.printer.enabled,false);
+ assert.throws(()=>applyAction(s,{id:'x',type:'printer',mode:'kitchen'},'waiter','Ana'));
+ assert.throws(()=>applyAction(s,{id:'x',type:'printer',mode:'invalid'},'owner','Dono'));
+ assert.throws(()=>applyAction(s,{id:'x',type:'printer',enabled:true},'owner','Dono'),/CloudPRNT/);
+ const updated=orderFor(s,'a','employee-a');assert.equal(updated.printJobs[0].destination,'waiter');assert.equal(updated.printJobs[0].employeeId,'employee-a');assert.equal(updated.orders[0].employeeId,'employee-a');
+ assert.equal(orderFor(updated,'a','employee-a').printJobs.length,1);
+});
+test('cozinha e CloudPRNT nunca consomem a fila portátil',()=>{
+ let s=orderFor(portableFixture(),'a','employee-a');assert.throws(()=>printScope(s,'kitchen'),/modo cozinha/);
+ assert.throws(()=>printScope(s,'kitchen',undefined,'a'),/não pode/);
+ assert.equal(pollQueue(s.printJobs,{enabled:true,statusCode:'200 OK'}).jobReady,false);
+ s=applyAction(s,{id:'mode2',type:'printer',mode:'kitchen'},'owner','Dono');
+ s=orderFor(s,'b','employee-a');assert.equal(s.printJobs[0].destination,'waiter');assert.equal(s.printJobs[1].destination,'kitchen');
+ assert.equal(claimLocalJob(printScope(s,'kitchen'),'k','t','2000-01-01').id,'b');
+});
+test('garçons com mesmo nome imprimem filas próprias e em paralelo',()=>{
+ let s=orderFor(portableFixture(),'a','employee-a');s=orderFor(s,'b','employee-b');
+ assert.throws(()=>printScope(s,'waiter','employee-b','a'),/não pode/);assert.throws(()=>printScope(s,'waiter',undefined,'a'),/não pode/);assert.equal(canPrintJob(s.printJobs[0],'cashier'),false);
+ assert.equal(claimLocalJob(printScope(s,'waiter','employee-a','a'),'d1','t1','2000-01-01',undefined,'a').id,'a');
+ assert.equal(claimLocalJob(printScope(s,'waiter','employee-b','b'),'d2','t2','2000-01-01',undefined,'b').id,'b');
+ assert.throws(()=>finishLocalJob(printScope(s,'waiter','employee-a','a'),'d2','t2','a',true));
+ finishLocalJob(printScope(s,'waiter','employee-a','a'),'d1','t1','a',true);assert.equal(s.printJobs[0].status,'sent');
+});
+test('visualização do garçom não expõe comandas alheias nem tokens de reserva',()=>{
+ let s=orderFor(portableFixture(),'a','employee-a');s=orderFor(s,'b','employee-b');
+ claimLocalJob(printScope(s,'waiter','employee-a','a'),'d','secret','2000-01-01');
+ const visible=publicWorkspace(s,'waiter','employee-a');assert.equal(visible.printJobs.length,1);assert.equal(visible.printJobs[0].id,'a');assert.equal('claimToken' in visible.printJobs[0],false);assert.equal('deviceId' in visible.printJobs[0],false);
+ assert.equal(publicWorkspace(s,'waiter').printJobs.length,0);assert.equal(publicWorkspace(s,'kitchen').printJobs.length,0);
+});
+test('segunda via exige acesso e mantém destino; só uma via pendente por pedido',()=>{
+ const s=orderFor(portableFixture(),'a','employee-a');s.printJobs[0].status='uncertain';
+ assert.throws(()=>copyPrintJob(s,'a','retry','waiter','employee-b'),/não pode/);
+ const copy=copyPrintJob(s,'a','retry','waiter','employee-a');assert.equal(copy.destination,'waiter');assert.match(copy.content,/SEGUNDA VIA/);
+ assert.throws(()=>copyPrintJob(s,'a','retry2','waiter','employee-a'),/pendente/);
+});
+test('cancelamento e segunda via do painel preservam destino original após troca de modo',()=>{
+ let s=orderFor(portableFixture(),'a','employee-a');s.printJobs[0].status='sent';
+ s=applyAction(s,{id:'mode2',type:'printer',mode:'kitchen'},'owner','Dono');
+ assert.throws(()=>applyAction(s,{id:'retry',type:'reprint',jobId:'a'},'kitchen','Cozinha'));
+ s=applyAction(s,{id:'cancel',type:'cancel',orderId:'a',reason:'Cliente desistiu'},'owner','Dono');assert.equal(s.printJobs.at(-1).destination,'waiter');assert.equal(s.printJobs.at(-1).employeeId,'employee-a');assert.match(s.printJobs.at(-1).content,/CANCELAMENTO/);
+});
+test('RawBT recebe bytes ESC/POS sanitizados de 58mm pelo esquema oficial',()=>{
+ const text='Camarão\n'+('a'.repeat(150))+'\n\x1b\x40<script>';
+ const uri=rawBtLink(text);assert.ok(uri.startsWith('rawbt:base64,'));const bytes=Buffer.from(uri.slice('rawbt:base64,'.length),'base64');assert.deepEqual([...bytes],[...escposBytes(text)]);
+});
+
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+import {z} from 'zod';
+function printApiHarness(initial,role='waiter',employeeId='employee-a'){
+ let state=structuredClone(initial),version=0,conflicts=0;
+ const exports={};
+ const code=ts.transpileModule(readFileSync(new URL('../app/api/local-print/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ const deps={
+  '@/lib/saas-billing':{assertSubscription:()=>{}},
+  '@/lib/access':{resolveAccess:async()=>({owner:'venue',role,employeeId:role==='owner'?null:employeeId})},
+  '@/lib/db':{readVenue:async()=>({state:structuredClone(state),version}),saveVenue:async(_owner,v,next)=>{if(conflicts){conflicts--;return false}if(v!==version)return false;state=next;version++;return true}},
+  '@/lib/local-print-queue':{claimLocalJob,finishLocalJob},'@/lib/print-access':{printScope,copyPrintJob},zod:{z}
+ };
+ new Function('require','exports',code)(name=>{if(!deps[name])throw Error(name);return deps[name]},exports);
+ return {state:()=>state,conflict:()=>{conflicts=1},call:async(body)=>{const r=await exports.POST(new Request('https://test.local/api/local-print',{method:'POST',headers:{origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify({deviceId:'phone',claimToken:'claim',since:'2000-01-01T00:00:00Z',...body})}));return {status:r.status,...await r.json()}}};
+}
+function apiFixture(){let s=orderFor(portableFixture(),'a','employee-a');s=orderFor(s,'b','employee-b');s.employees=[{id:'employee-a',name:'Ana',role:'waiter',active:true},{id:'employee-b',name:'Ana',role:'waiter',active:true}];return s}
+test('API autoriza somente comanda própria e não registra abrir aplicativo como papel impresso',async()=>{
+ const api=printApiHarness(apiFixture());assert.equal((await api.call({type:'claim',jobId:'b'})).status,400);assert.equal((await api.call({type:'arm'})).status,400);
+ api.conflict();const reserved=await api.call({type:'claim',jobId:'a'});assert.equal(reserved.status,200);assert.equal(reserved.job.id,'a');assert.equal(api.state().printJobs[0].status,'printing');
+ assert.equal((await api.call({type:'finish',jobId:'a',success:true,claimToken:'wrong'})).status,400);
+ assert.equal((await api.call({type:'finish',jobId:'a',success:true})).status,200);assert.equal(api.state().printJobs[0].status,'sent');
+ assert.equal((await api.call({type:'claim',jobId:'a'})).job,null);
+ const retry=await api.call({type:'claim',jobId:'a',claimToken:'second',reprint:true});assert.equal(retry.status,200);assert.equal(retry.job.id,'second');assert.match(retry.job.content,/SEGUNDA VIA/);
+});
+test('API rejeita funcionário revogado e cozinha no modo portátil',async()=>{
+ const s=apiFixture();s.employees[0].active=false;assert.equal((await printApiHarness(s).call({type:'claim',jobId:'a'})).status,400);
+ const k=apiFixture();k.employees.push({id:'cook',name:'Chef',role:'kitchen',active:true});const api=printApiHarness(k,'kitchen','cook');assert.equal((await api.call({type:'arm'})).status,400);assert.equal((await api.call({type:'claim',jobId:'a'})).status,400);
+});
+
+test('pedido cancelado não permite nova via de preparo, apenas aviso de cancelamento',()=>{
+ let s=orderFor(portableFixture(),'a','employee-a');s=applyAction(s,{id:'cancel',type:'cancel',orderId:'a',reason:'Desistência'},'owner','Dono');
+ assert.throws(()=>copyPrintJob(s,'a','retry','waiter','employee-a'),/cancelado/);
+ assert.throws(()=>applyAction(s,{id:'again',type:'reprint',jobId:'a'},'owner','Dono'),/cancelamento/);
+ s.printJobs.find(j=>j.id==='cancel').status='uncertain';assert.match(copyPrintJob(s,'cancel','retry','waiter','employee-a').content,/CANCELAMENTO/);
+});
