@@ -35,3 +35,17 @@ Não é possível garantir Bluetooth direto ou abertura de apps em todo navegado
 ## Verificação
 
 49 testes passaram, incluindo API autenticada com banco simulado, isolamento entre garçons com o mesmo nome, cancelamento, concorrência, segunda via, CAS e igualdade dos bytes RawBT/ESC-POS. Interface móvel e URI Android verificadas com dados fictícios, sem abrir aplicativo nem acionar hardware. TC-163, versões reais dos navegadores e saída física pelo RawBT precisam de teste no aparelho; build ou teste simulado não comprovam impressão física.
+
+
+## Configuração guiada (outubro de 2026)
+
+- A configuração agora identifica APIs reais de Serial/BLE e contexto HTTPS; Android não é presumido incompatível. Primeiro oferece conexão sem aplicativo, quando disponível.
+- Botões Serial e BLE só aparecem quando existe a API correspondente. A configuração é compartilhada entre painel, cozinha e comandas do garçom.
+- Conectar → imprimir teste → confirmar saída do papel. O automático só libera depois da confirmação. Desconexão, troca de aparelho/impressora ou erro de transporte invalidam o teste. Retomar mantém o corte da primeira ativação para não pular pedidos recebidos durante a pausa.
+- Impressora já conectada tem prioridade sobre preferência antiga de RawBT. O método escolhido pelo usuário continua ajustável.
+- Android sem API, ou conexão direta malsucedida: tutorial RawBT em três passos (instalar, parear/configurar e testar pelo site), com alternativa Open ESC/POS. Abertura por toque e confirmação manual continuam obrigatórias.
+- iPhone sem API: instruções condicionais. Bluefy é oferecido após informar que a impressora tem BLE; uma TC-163 Classic não se torna BLE. AirPrint requer equipamento/ponte de rede compatível. A configuração sugere central na cozinha quando não houver conexão local compatível.
+- O acesso individual pode ser copiado por ação do usuário para abrir a barraca no Bluefy. Não registrar nem exibir o token em logs/documentação.
+- Não é possível garantir impressão Bluetooth local sem aplicativo em todos os celulares/navegadores apenas mudando o site. Fontes primárias: https://developer.chrome.com/release-notes/138#web_serial_over_bluetooth_on_android , https://developer.chrome.com/docs/capabilities/bluetooth , https://bluefy.app/guide.html , https://support.apple.com/en-au/109349 .
+
+Verificação desta revisão: 60 testes passaram e a interface foi revisada em simulação local de Serial, BLE apenas, Android sem API e iPhone sem API; tamanhos móveis de 390 e 320 px. Confirmado bloqueio do automático antes do teste e liberação após confirmação. Nenhum equipamento real foi acionado: saída física TC-163 continua pendente de teste no aparelho do cliente.
