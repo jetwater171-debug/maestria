@@ -101,3 +101,9 @@ test('nova conexão invalida confirmação do papel; trocar preferência não in
  confirmPrinterTest();assert.equal(printerTestConfirmed(),true);notifyPrinterChange();assert.equal(printerTestConfirmed(),true);
  notifyPrinterChange(true);assert.equal(printerConnectionRevision(),version+1);assert.equal(printerTestConfirmed(),false);
 });
+
+test('central compartilhada só é escolhida quando autorizada; conexão local mantém prioridade',()=>{
+ const ios=getPrinterCapabilities({userAgent:'iPhone',secureContext:true,systemPrint:()=>{}});
+ assert.equal(preferredReceiptMethod(ios,false,null,true),'hub');assert.equal(preferredReceiptMethod(ios,false,'hub',false),'system');
+ assert.equal(preferredReceiptMethod(ios,true,'hub',true),'direct');
+});

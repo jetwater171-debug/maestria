@@ -9,7 +9,7 @@ O dono escolhe em Configurações → Onde os pedidos serão impressos.
 
 ## Android
 
-RawBT é a opção inicial em Imprimir comanda. Instalar pela Play Store, autorizar Bluetooth, selecionar a TC-163 dentro do aplicativo e testar em 58 mm. A tela também oferece Open ESC/POS e impressão do navegador (que depende de um serviço de impressão instalado).
+Conexão direta é oferecida quando o navegador expõe as APIs necessárias. Quando não oferece, o tutorial apresenta RawBT: instalar pela Play Store, autorizar Bluetooth, selecionar a TC-163 dentro do aplicativo e testar em 58 mm. A tela também oferece Open ESC/POS e impressão do navegador (que depende de um serviço de impressão instalado).
 
 O site reserva a comanda primeiro. Um novo toque abre `rawbt:base64,<bytes ESC/POS>`, preservando a ativação do usuário exigida pelo navegador. O código apenas implementa o protocolo público, sem copiar código do aplicativo. ESC/POS usa ASCII sem acentos, quebra em 32 colunas, inicialização e avanço de papel; caracteres de controle enviados pelo cliente são removidos.
 
@@ -34,7 +34,7 @@ Não é possível garantir Bluetooth direto ou abertura de apps em todo navegado
 
 ## Verificação
 
-49 testes passaram, incluindo API autenticada com banco simulado, isolamento entre garçons com o mesmo nome, cancelamento, concorrência, segunda via, CAS e igualdade dos bytes RawBT/ESC-POS. Interface móvel e URI Android verificadas com dados fictícios, sem abrir aplicativo nem acionar hardware. TC-163, versões reais dos navegadores e saída física pelo RawBT precisam de teste no aparelho; build ou teste simulado não comprovam impressão física.
+Os testes incluem API autenticada com banco simulado, isolamento entre garçons com o mesmo nome, cancelamento, concorrência, segunda via, CAS e igualdade dos bytes RawBT/ESC-POS. TC-163, versões reais dos navegadores e saída física pelo RawBT precisam de teste no aparelho; build ou teste simulado não comprovam impressão física.
 
 
 ## Configuração guiada (outubro de 2026)
@@ -48,4 +48,20 @@ Não é possível garantir Bluetooth direto ou abertura de apps em todo navegado
 - O acesso individual pode ser copiado por ação do usuário para abrir a barraca no Bluefy. Não registrar nem exibir o token em logs/documentação.
 - Não é possível garantir impressão Bluetooth local sem aplicativo em todos os celulares/navegadores apenas mudando o site. Fontes primárias: https://developer.chrome.com/release-notes/138#web_serial_over_bluetooth_on_android , https://developer.chrome.com/docs/capabilities/bluetooth , https://bluefy.app/guide.html , https://support.apple.com/en-au/109349 .
 
-Verificação desta revisão: 60 testes passaram e a interface foi revisada em simulação local de Serial, BLE apenas, Android sem API e iPhone sem API; tamanhos móveis de 390 e 320 px. Confirmado bloqueio do automático antes do teste e liberação após confirmação. Nenhum equipamento real foi acionado: saída física TC-163 continua pendente de teste no aparelho do cliente.
+## Central compartilhada (19/10/2026)
+
+O dono pode ativar **Permitir central compartilhada**. Isso mantém os dois modos de trabalho e permite que qualquer navegador autorizado solicite uma comanda pelo site, mesmo sem acesso ao Bluetooth local.
+
+1. Na cozinha, conectar e testar a impressora em um Android/computador com conexão Serial ou BLE compatível.
+2. Confirmar a saída do teste e tocar em **Ativar automático**. Manter a cozinha aberta, com internet e aparelho ligado.
+3. Nos outros celulares, escolher **Imprimir na central**. O papel sai na cozinha, não na impressora portátil do garçom.
+
+No modo cozinha, novos pedidos continuam sendo impressos automaticamente. No modo garçom, a central só recebe comandas portáteis explicitamente encaminhadas; cada garçom pode encaminhar apenas as suas. A configuração não dá à cozinha acesso à fila portátil inteira.
+
+A central consulta a fila a cada quatro segundos. Sua sessão expira após vinte segundos sem sinal; durante um transporte longo, um heartbeat separado mantém a disponibilidade. Só um aparelho ocupa a central por barraca. Pausar/retomar usa nova identidade de sessão para que uma liberação atrasada não desative a nova central. Trabalhos enviados/incertos não são repetidos automaticamente. Reenvio de solicitação ainda na fila é idempotente; segunda via exige conferência explícita.
+
+No iPhone, o tutorial também apresenta a extensão **beacio** como alternativa experimental para BLE no Safari: requer app/extensão, iOS 26.2+ conforme a App Store atual e impressora BLE. Não funciona com Classic/SPP, nem adiciona Bluetooth ao PWA. A central compartilhada dispensa essa extensão nos celulares que apenas solicitam impressão.
+
+O status online é indicativo; o servidor valida a sessão e a autorização em cada solicitação. Não exige SQL novo. A central precisa de internet e aba em primeiro plano, e não substitui um servidor local offline.
+
+Pesquisa e fontes: [printing-research.md](printing-research.md). 74 testes passaram. Interface revisada em simulação local de iPhone sem APIs, 390 e 320 px, com solicitação HTTP encaminhada e sem acionamento de hardware. A saída física continua pendente de teste na TC-163 do cliente.

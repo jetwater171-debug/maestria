@@ -44,9 +44,10 @@ export function applyAction(state:State,a:Action,role:Role,author:string,now=new
  case 'revoke':{const e=s.employees.find(e=>e.id===a.employeeId);if(!e)throw Error('Funcionário não encontrado.');e.active=false;break}
  case 'printer':{
   if(a.mode!==undefined&&!['kitchen','waiter'].includes(String(a.mode)))throw Error('Escolha onde imprimir.');
+  if(a.relayEnabled!==undefined&&typeof a.relayEnabled!=='boolean')throw Error('Confira a opção da central.');
   const mode=(a.mode??s.printer?.mode??'kitchen') as 'kitchen'|'waiter';
   if(mode==='waiter'&&a.enabled===true)throw Error('CloudPRNT é exclusivo da cozinha.');
-  s.printer={...s.printer,mode,enabled:mode==='waiter'?false:(a.enabled===undefined?s.printer?.enabled??false:a.enabled===true)};break;
+  s.printer={...s.printer,mode,relayEnabled:a.relayEnabled===undefined?s.printer?.relayEnabled??false:a.relayEnabled===true,enabled:mode==='waiter'?false:(a.enabled===undefined?s.printer?.enabled??false:a.enabled===true)};break;
  }
  case 'printTest':{s.printJobs||=[];s.printJobs.push({id:a.id,orderId:'test',destination:s.printer?.mode||'kitchen',content:'MAESTRIA BEACH\nTESTE DE IMPRESSAO\nConexao automatica configurada.\n\n\n',status:'queued',createdAt:now});break}
  case 'reprint':{s.printJobs||=[];const old=s.printJobs.find(j=>j.id===a.jobId);if(!old||role==='kitchen'&&old.destination==='waiter'||old.status==='printing'||old.status==='queued')throw Error('Confira o status da comanda antes de reimprimir.');if(s.orders.some(o=>o.id===old.orderId&&o.status==='cancelled')&&!old.content.includes('\nCANCELAMENTO\n'))throw Error('Use a comanda de cancelamento.');if(s.printJobs.some(j=>j.orderId===old.orderId&&['queued','printing'].includes(j.status)))throw Error('Já existe uma via pendente deste pedido.');s.printJobs.push({id:a.id,orderId:old.orderId,destination:old.destination||'kitchen',employeeId:old.employeeId,content:'REIMPRESSAO - CONFERIR DUPLICIDADE\n'+old.content,status:'queued',createdAt:now});break}

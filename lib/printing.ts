@@ -1,6 +1,6 @@
 export type PrintMode='kitchen'|'waiter';
-export type PrintJob={destination?:PrintMode;employeeId?:string;id:string;orderId:string;content:string;status:'queued'|'printing'|'printed'|'sent'|'failed'|'uncertain';createdAt:string;claimedAt?:string;completedAt?:string;error?:string;claimToken?:string;deviceId?:string};
-export type PrinterState={mode?:PrintMode;enabled:boolean;lastSeen?:string;deviceStatus?:string};
+export type PrintJob={destination?:PrintMode;employeeId?:string;id:string;orderId:string;content:string;status:'queued'|'printing'|'printed'|'sent'|'failed'|'uncertain';createdAt:string;claimedAt?:string;completedAt?:string;error?:string;claimToken?:string;deviceId?:string;relay?:{hubId:string;requestedAt:string;requestedBy?:string}};
+export type PrinterState={mode?:PrintMode;enabled:boolean;lastSeen?:string;deviceStatus?:string;relayEnabled?:boolean;hub?:{deviceId:string;lastSeen:string;startedAt:string}};
 export function ticket(venue:string,table:string,order:{id:string;createdAt:string;author:string;note:string;lines:{name:string;quantity:number;station:string;note?:string}[]},kind='NOVO PEDIDO'){
  const clean=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\x00-\x08\x0b-\x1f\x7f]/g,'');
  return clean([venue.toUpperCase(),kind,table.toUpperCase(),`#${order.id.slice(-8).toUpperCase()}`,new Date(order.createdAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),'--------------------------------',...order.lines.map(l=>`${l.quantity}x ${l.name}${l.note?'\n   OBS: '+l.note:''}\n   ${l.station==='bar'?'BAR':'COZINHA'}`),'--------------------------------',order.note?`OBS: ${order.note}`:'',`Atendimento: ${order.author}`,'COMANDA NAO FISCAL','\n\n'].join('\n'));

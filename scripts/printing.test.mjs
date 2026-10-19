@@ -117,6 +117,7 @@ test('RawBT recebe bytes ESC/POS sanitizados de 58mm pelo esquema oficial',()=>{
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 import {z} from 'zod';
+import {registerHub,touchHub,releaseHub,requestHubPrint,hubJobs} from '../lib/print-hub.ts';
 function printApiHarness(initial,role='waiter',employeeId='employee-a'){
  let state=structuredClone(initial),version=0,conflicts=0;
  const exports={};
@@ -125,10 +126,10 @@ function printApiHarness(initial,role='waiter',employeeId='employee-a'){
   '@/lib/saas-billing':{assertSubscription:()=>{}},
   '@/lib/access':{resolveAccess:async()=>({owner:'venue',role,employeeId:role==='owner'?null:employeeId})},
   '@/lib/db':{readVenue:async()=>({state:structuredClone(state),version}),saveVenue:async(_owner,v,next)=>{if(conflicts){conflicts--;return false}if(v!==version)return false;state=next;version++;return true}},
-  '@/lib/local-print-queue':{claimLocalJob,finishLocalJob},'@/lib/print-access':{printScope,copyPrintJob},zod:{z}
+  '@/lib/print-hub':{registerHub,touchHub,releaseHub,requestHubPrint,hubJobs},'@/lib/local-print-queue':{claimLocalJob,finishLocalJob},'@/lib/print-access':{printScope,copyPrintJob},zod:{z}
  };
  new Function('require','exports',code)(name=>{if(!deps[name])throw Error(name);return deps[name]},exports);
- return {state:()=>state,conflict:()=>{conflicts=1},call:async(body)=>{const r=await exports.POST(new Request('https://test.local/api/local-print',{method:'POST',headers:{origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify({deviceId:'phone',claimToken:'claim',since:'2000-01-01T00:00:00Z',...body})}));return {status:r.status,...await r.json()}}};
+ return {state:()=>state,replaceState:next=>{state=structuredClone(next);version++},conflict:()=>{conflicts=1},call:async(body)=>{const r=await exports.POST(new Request('https://test.local/api/local-print',{method:'POST',headers:{origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify({deviceId:'phone',claimToken:'claim',since:'2000-01-01T00:00:00Z',...body})}));return {status:r.status,...await r.json()}}};
 }
 function apiFixture(){let s=orderFor(portableFixture(),'a','employee-a');s=orderFor(s,'b','employee-b');s.employees=[{id:'employee-a',name:'Ana',role:'waiter',active:true},{id:'employee-b',name:'Ana',role:'waiter',active:true}];return s}
 test('API autoriza somente comanda própria e não registra abrir aplicativo como papel impresso',async()=>{
@@ -149,4 +150,58 @@ test('pedido cancelado não permite nova via de preparo, apenas aviso de cancela
  assert.throws(()=>copyPrintJob(s,'a','retry','waiter','employee-a'),/cancelado/);
  assert.throws(()=>applyAction(s,{id:'again',type:'reprint',jobId:'a'},'owner','Dono'),/cancelamento/);
  s.printJobs.find(j=>j.id==='cancel').status='uncertain';assert.match(copyPrintJob(s,'cancel','retry','waiter','employee-a').content,/CANCELAMENTO/);
+});
+
+test('API central recebe pedido autorizado de Safari sem acesso local ao Bluetooth',async()=>{
+ const s=apiFixture();s.printer.relayEnabled=true;s.employees.push({id:'cook',name:'Chef',role:'kitchen',active:true});s.printJobs.forEach(j=>j.createdAt='2020-01-01T00:00:00Z');
+ const central=printApiHarness(s,'kitchen','cook');assert.equal((await central.call({type:'arm',hub:true,deviceId:'hub'})).status,200);
+ const waiter=printApiHarness(central.state());assert.equal((await waiter.call({type:'relay',jobId:'b'})).status,400);
+ waiter.conflict();assert.equal((await waiter.call({type:'relay',jobId:'a'})).status,200);assert.equal((await waiter.call({type:'relay',jobId:'a'})).status,200);assert.equal(waiter.state().printJobs.length,2);
+ central.replaceState(waiter.state());
+ const since=new Date().toISOString();const claimed=await central.call({type:'claim',hub:true,deviceId:'hub',claimToken:'native',since});assert.equal(claimed.status,200);assert.equal(claimed.job.id,'a');
+ assert.equal((await central.call({type:'finish',hub:true,deviceId:'hub',claimToken:'wrong',jobId:'a',success:true})).status,400);
+ assert.equal((await central.call({type:'finish',hub:true,deviceId:'hub',claimToken:'native',jobId:'a',success:true})).status,200);assert.equal(central.state().printJobs[0].status,'sent');
+ waiter.replaceState(central.state());assert.equal((await waiter.call({type:'relay',jobId:'a'})).status,400);
+});
+test('API central bloqueia concorrente, funcionário revogado, lease antigo e flag forjada',async()=>{
+ const s=apiFixture();s.printer.relayEnabled=true;s.employees.push({id:'cook',name:'Chef',role:'kitchen',active:true});
+ const central=printApiHarness(s,'kitchen','cook');await central.call({type:'arm',hub:true,deviceId:'hub'});
+ assert.equal((await central.call({type:'arm',hub:true,deviceId:'other'})).status,400);
+ const waiter=printApiHarness(central.state());assert.equal((await waiter.call({type:'claim',hub:true,deviceId:'hub',jobId:'b'})).status,400);
+ const stale=structuredClone(central.state());stale.printer.hub.lastSeen='2020-01-01';waiter.replaceState(stale);assert.equal((await waiter.call({type:'relay',jobId:'a'})).status,400);
+ stale.printer.hub.lastSeen=new Date().toISOString();stale.employees[0].active=false;waiter.replaceState(stale);assert.equal((await waiter.call({type:'relay',jobId:'a'})).status,400);
+ assert.equal((await central.call({type:'release',deviceId:'other'})).status,200);assert.equal(central.state().printer.hub.deviceId,'hub');
+ await central.call({type:'release',deviceId:'hub'});assert.equal(central.state().printer.hub,undefined);
+});
+test('dono controla compartilhamento; garçom não habilita a própria central',()=>{
+ const s=apiFixture();assert.throws(()=>applyAction(s,{id:'relay-mode',type:'printer',relayEnabled:true},'waiter','Ana'));
+ assert.throws(()=>applyAction(s,{id:'relay-mode',type:'printer',relayEnabled:'yes'},'owner','Dono'));
+ const enabled=applyAction(s,{id:'relay-mode',type:'printer',relayEnabled:true},'owner','Dono');assert.equal(enabled.printer.relayEnabled,true);
+});
+
+test('repetir ativação da central mantém corte da sessão mesmo com resposta perdida',async()=>{
+ const s=apiFixture();s.printer.relayEnabled=true;s.printer.hub={deviceId:'hub',startedAt:new Date(Date.now()-5000).toISOString(),lastSeen:new Date().toISOString()};
+ const api=printApiHarness(s,'owner');const first=s.printer.hub.startedAt;
+ assert.equal((await api.call({type:'arm',hub:true,deviceId:'hub'})).since,first);
+ assert.equal((await api.call({type:'arm',hub:true,deviceId:'hub'})).since,first);
+});
+
+test('heartbeat mantém central disponível durante envio sem reservar nem concluir outra comanda',async()=>{
+ const s=apiFixture();s.printer.relayEnabled=true;s.printer.hub={deviceId:'hub',startedAt:new Date(Date.now()-30000).toISOString(),lastSeen:new Date(Date.now()-19000).toISOString()};
+ s.printJobs[0].status='printing';s.printJobs[0].deviceId='hub';s.printJobs[0].claimToken='private';
+ const api=printApiHarness(s,'owner');const before=JSON.stringify(s.printJobs);api.conflict();
+ assert.equal((await api.call({type:'heartbeat',hub:true,deviceId:'hub'})).status,200);
+ assert.ok(Date.now()-Date.parse(api.state().printer.hub.lastSeen)<1000);assert.equal(JSON.stringify(api.state().printJobs),before);
+ assert.equal((await api.call({type:'heartbeat',hub:true,deviceId:'other'})).status,400);
+ assert.equal((await api.call({type:'heartbeat',deviceId:'hub'})).status,400);
+ assert.equal((await printApiHarness(api.state()).call({type:'heartbeat',hub:true,deviceId:'hub'})).status,400);
+});
+
+test('liberação atrasada da sessão anterior não remove a central retomada',async()=>{
+ const s=apiFixture();s.printer.relayEnabled=true;const api=printApiHarness(s,'owner');
+ await api.call({type:'arm',hub:true,deviceId:'old-session'});await api.call({type:'release',deviceId:'old-session'});
+ await api.call({type:'arm',hub:true,deviceId:'new-session'});await api.call({type:'release',deviceId:'old-session'});
+ assert.equal(api.state().printer.hub.deviceId,'new-session');
+ assert.equal((await api.call({type:'heartbeat',hub:true,deviceId:'old-session'})).status,400);
+ assert.equal((await api.call({type:'heartbeat',hub:true,deviceId:'new-session'})).status,200);
 });
