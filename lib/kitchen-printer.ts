@@ -15,7 +15,7 @@ export function printerConnectionError(error:unknown){
 }
 export async function connectKitchenPrinter(useSaved=true){
  const serial=typeof navigator==='undefined'?undefined:(navigator as Navigator & {serial?:SerialApi}).serial;
- if(typeof serial?.requestPort!=='function')throw Error('Este navegador não conecta diretamente à TC-163. No Android, abra o Chrome atualizado. No iPhone, use a cozinha aberta no MacBook ou em outro aparelho compatível para imprimir os pedidos.');
+ if(typeof serial?.requestPort!=='function')throw Error('Este navegador não conecta diretamente à TC-163. No Android, abra o Chrome atualizado. No iPhone, abra no Bluefy e use Buscar impressora BLE; sua unidade precisa oferecer BLE.');
  if(port?.writable)return;
  try{
   // SPP is a standard service: requestPort() already exposes it. Do not limit the native chooser.

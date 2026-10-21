@@ -2,7 +2,7 @@
 
 O dono escolhe em Configurações → Onde os pedidos serão impressos.
 
-- Com o garçom: novos pedidos geram comandas atribuídas ao funcionário autenticado. A fila aparece em Mesas, inclusive para o dono. O garçom prepara, imprime e leva o papel. A cozinha continua vendo o pedido, mas sua impressão automática não consome essa fila.
+- Com o garçom: novos pedidos geram comandas atribuídas ao funcionário autenticado. Com a conexão direta testada, o botão Enviar e imprimir salva o pedido e já envia a comanda ao aparelho do garçom. A cozinha continua vendo o pedido, mas sua impressão automática não consome essa fila.
 - Direto na cozinha (padrão legado): novos pedidos entram na fila central; impressão automática via conexão Serial/BLE compatível ou Star CloudPRNT. Para o modo direto, manter tela da cozinha aberta, dispositivo ativo e impressora conectada.
 - Trocas valem para novos pedidos. Destinos existentes não mudam; cancelamentos e segundas vias preservam destino e funcionário. A troca para garçom desliga o CloudPRNT.
 - Configuração e novos campos vivem no JSON da barraca. Não exige migração SQL.
@@ -10,6 +10,16 @@ O dono escolhe em Configurações → Onde os pedidos serão impressos.
 ## Android
 
 Conexão direta é oferecida quando o navegador expõe as APIs necessárias. Quando não oferece, o tutorial apresenta RawBT: instalar pela Play Store, autorizar Bluetooth, selecionar a TC-163 dentro do aplicativo e testar em 58 mm. A tela também oferece Open ESC/POS e impressão do navegador (que depende de um serviço de impressão instalado).
+
+## Enviar e imprimir no celular do garçom (21/10/2026)
+
+Escolher Com o garçom nas configurações (ou Usar impressora com o garçom na configuração da impressora), conectar por Serial/BLE e confirmar o teste uma vez por conexão. O envio normal não pede outro botão de impressão. Sem conexão testada, o carrinho permanece aberto e a configuração é mostrada antes de enviar.
+
+Depois da confirmação do pedido pelo servidor, o cliente reserva sua comanda e envia o conteúdo retornado pelo servidor. Uma fila local serializa pedidos rápidos; a reserva autenticada impede repetição por resposta perdida, toque duplo ou sincronização offline. Pedidos offline só imprimem depois de sincronizados e com conexão direta testada. Trabalhos enviados/incertos e histórico não são repetidos automaticamente. Falha de impressão não desfaz o pedido recebido: mostrar alerta e conferir a fila/papel antes de outra via. O modo cozinha continua disponível.
+
+As fotos fornecidas identificam a unidade vendida como HAVENDO.L TC-163: autoteste JK-5801P, firmware V3.2F, nome KPrinter_523c, interfaces BT/USB, desligamento automático após 10 minutos. O manual informa ESC/POS, papel de aproximadamente 58 mm e área imprimível de 48 mm. A indicação BT não especifica Classic versus BLE. Bluefy só oferece o caminho direto quando a unidade disponibiliza BLE/GATT compatível; não converte SPP em BLE. UUID desconhecido não recebe comandos automaticamente.
+
+87 testes passaram, incluindo envio sem botão extra, sequência de pedidos, toque duplo, perda de reserva/confirmação e interrupção parcial. Testes de transporte usaram simulação; não comprovam papel físico nem confirmam BLE nesta unidade.
 
 O site reserva a comanda primeiro. Um novo toque abre `rawbt:base64,<bytes ESC/POS>`, preservando a ativação do usuário exigida pelo navegador. O código apenas implementa o protocolo público, sem copiar código do aplicativo. ESC/POS usa ASCII sem acentos, quebra em 32 colunas, inicialização e avanço de papel; caracteres de controle enviados pelo cliente são removidos.
 
