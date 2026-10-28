@@ -44,6 +44,22 @@ export function getPrinterCapabilities(input: PrinterCapabilityInput = {}) {
 
 export type PrinterCapabilities = ReturnType<typeof getPrinterCapabilities>;
 
+/** Support report contains capabilities only: never access links, tokens or orders. */
+export function printerCompatibilityReport(caps:PrinterCapabilities,connected=false,verified=false){
+ const yes=(value:boolean)=>value?'sim':'não';
+ return ['Maestria Beach — compatibilidade de impressão',
+  `Aparelho: ${caps.platform==='ios'?'iPhone / iPad':caps.platform==='android'?'Android':'Computador'}`,
+  `Contexto seguro: ${yes(caps.secureContext)}`,
+  `Navegador interno: ${yes(caps.embeddedBrowser)}`,
+  `Conexão Serial oferecida pelo navegador: ${yes(caps.directSerial)}`,
+  `Conexão BLE oferecida pelo navegador: ${yes(caps.directBle)}`,
+  `Impressão do sistema disponível: ${yes(caps.systemPrintAvailable)}`,
+  `Conexão local ativa: ${yes(connected)}`,
+  `Teste em papel confirmado nesta conexão: ${yes(connected&&verified)}`,
+  'A compatibilidade BLE/AirPrint e o papel impresso dependem de teste no equipamento.',
+ ].join('\n');
+}
+
 /** Safe to import/render on the server. Re-read after mounting to inspect this device. */
 export function browserPrinterCapabilities(options: PrinterCompatibilityOptions = {}): PrinterCapabilities {
  if (typeof window === 'undefined' || typeof navigator === 'undefined') return getPrinterCapabilities(options);

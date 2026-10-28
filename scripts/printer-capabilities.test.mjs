@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {getPrinterCapabilities, browserPrinterCapabilities} from '../lib/printer-capabilities.ts';
+import {getPrinterCapabilities, browserPrinterCapabilities, printerCompatibilityReport} from '../lib/printer-capabilities.ts';
 
 const serial = {requestPort() {}};
 const bluetooth = {requestDevice() {}};
@@ -81,6 +81,15 @@ test('helper de navegador é seguro no servidor e não acessa APIs no import', (
  assert.equal(c.directSerial,false);
  assert.equal(c.directBle,false);
  assert.equal(c.recommendedMethod,'other-device');
+});
+
+test('relatório de suporte informa capacidade e não confunde API com teste físico',()=>{
+ const caps=getPrinterCapabilities({userAgent:'iPhone user-secret',secureContext:true,bluetooth});
+ const report=printerCompatibilityReport(caps,false,true);
+ assert.match(report,/Conexão BLE oferecida pelo navegador: sim/);
+ assert.match(report,/Teste em papel confirmado nesta conexão: não/);
+ assert.equal(report.includes('user-secret'),false);
+ assert.match(printerCompatibilityReport(caps,true,true),/Teste em papel confirmado nesta conexão: sim/);
 });
 
 import {preferredReceiptMethod} from '../lib/print-method.ts';

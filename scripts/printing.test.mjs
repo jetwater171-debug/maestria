@@ -62,6 +62,30 @@ test('scanner usa exclusivamente modelo escolhido e esquema multimodal LLM7',()=
 test('iPhone e iPad são identificados sem confundir MacBook',()=>{assert.equal(printerPlatform('iPhone'),'ios');assert.equal(printerPlatform('Macintosh',5),'ios');assert.equal(printerPlatform('Macintosh',0),'desktop');assert.equal(printerPlatform('Android Chrome/138'),'android');assert.match(printerConnectionError({name:'NotFoundError'}),/lista ficou vazia/);assert.match(printerConnectionError({name:'NetworkError'}),/notebook/)});
 test('seletor usa SPP padrão, reconecta porta autorizada e limpa conexão ao sair',async()=>{const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');let chooser=0,opens=0,closed=0;const p={writable:{locked:false},open:async()=>{opens++},close:async()=>{closed++},addEventListener:()=>{}};Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{getPorts:async()=>[p],requestPort:async(...args)=>{assert.equal(args.length,0);chooser++;return p}}}});try{await connectKitchenPrinter();assert.equal(chooser,0);assert.equal(opens,1);assert.equal(printerAvailable(),true);await disconnectKitchenPrinter();assert.equal(closed,1);await connectKitchenPrinter(false);assert.equal(chooser,1);await disconnectKitchenPrinter()}finally{if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}});
 
+test('timeout serial interrompe blocos posteriores e fecha a porta após a escrita pendente',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),realSetTimeout=globalThis.setTimeout;
+ let writes=0,closed=0,release;
+ const stream=new WritableStream({write(){writes++;return new Promise(resolve=>{release=resolve})}});
+ const p={writable:stream,open:async()=>{},close:async()=>{assert.equal(stream.locked,false);closed++},addEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{requestPort:async()=>p}}});
+ globalThis.setTimeout=(callback,delay,...args)=>realSetTimeout(callback,delay===40000?1:delay,...args);
+ try{
+  await connectKitchenPrinter(false);
+  await assert.rejects(printKitchenReceipt('slow','x'.repeat(500)),/Envio interrompido/);
+  assert.equal(printerAvailable(),false);assert.equal(writes,1);assert.equal(stream.locked,true);
+  release();await new Promise(resolve=>realSetTimeout(resolve,70));
+  assert.equal(writes,1);assert.equal(stream.locked,false);assert.equal(closed,1);
+ }finally{release?.();globalThis.setTimeout=realSetTimeout;if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}
+});
+
+test('falha serial libera e fecha a conexão antiga antes de nova tentativa',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');let closed=0;
+ const stream=new WritableStream({write(){throw Error('Bluetooth desconectado')}});
+ const p={writable:stream,open:async()=>{},close:async()=>{assert.equal(stream.locked,false);closed++},addEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{requestPort:async()=>p}}});
+ try{await connectKitchenPrinter(false);await assert.rejects(printKitchenReceipt('broken','Teste'),/Bluetooth desconectado/);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(printerAvailable(),false);assert.equal(stream.locked,false);assert.equal(closed,1)}finally{if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}
+});
+
 import {printScope,canPrintJob,copyPrintJob} from '../lib/print-access.ts';
 import {publicWorkspace} from '../lib/workspace-view.ts';
 import {rawBtLink} from '../lib/android-print.ts';

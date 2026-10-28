@@ -7,9 +7,6 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://maestriaa.vercel.app'),
   title: "Maestria Beach • Sua barraca sob controle",
   description: "Mesas, pedidos, cozinha e caixa conectados.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

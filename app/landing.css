@@ -265,6 +265,54 @@ html:has(.lp){scroll-behavior:smooth}
  .lp-compact .lp-hero-visual .lp-phone{bottom:-206px}
  .lp-compact .lp-benefit{padding-right:18px!important}
 }
+
+/* Subscription and practical setup share one complete, configurable offer. */
+.lp-nav-access{display:flex;align-items:center;gap:18px;flex-shrink:0}
+.lp .lp-mobile-plan{display:none;font-size:11px;min-height:44px;align-items:center}
+.lp-subscription{background:#f8f7ef;border-bottom:1px solid #e5e8dd}
+.lp-subscription .lp-section-title>p{max-width:510px}
+.lp-subscription-grid{display:grid;grid-template-columns:1fr 1fr;gap:74px;margin-top:36px;align-items:center}
+.lp-plan{background:#163f3e;color:#fffdf1;padding:36px;border-radius:20px;box-shadow:0 18px 40px #173e3d0d;min-width:0}
+.lp-plan-heading{display:flex;align-items:center;gap:13px;font-size:9px;letter-spacing:1.25px;color:#b9d0bd}
+.lp-plan-symbol{display:grid;place-items:center;border:1px solid #87ac9d66;border-radius:50%;width:46px;height:46px;flex-shrink:0;color:#e6e9bd}
+.lp-plan h3{font-size:29px;letter-spacing:-1px;line-height:1.3;margin-top:23px}
+.lp-plan-intro{color:#b6cebf;font-size:13px;margin-top:6px!important}
+.lp-plan-price{padding-block:25px;margin-top:6px;border-bottom:1px solid #7eaa9c44}
+.lp-plan-price strong{display:block;font-size:37px;font-weight:500;letter-spacing:-1.3px;line-height:1.2}
+.lp-plan-price>span{display:block;color:#c2d2c4;font-size:12px;margin-top:10px;line-height:1.7}
+.lp-plan ul{list-style:none;display:grid;gap:13px;padding:24px 0;margin:0;font-size:13px;line-height:1.6}
+.lp-plan li{display:flex;gap:12px;align-items:flex-start}
+.lp-plan li svg{color:#c4d6ad;margin-top:2px}
+.lp .lp-plan .lp-cta{width:100%;background:#e9edc9;color:#1e4540;justify-content:space-between;white-space:normal}
+.lp .lp-plan .lp-cta:hover{background:#f3f4db}
+.lp-plan-caption{text-align:center;font-size:10px!important;line-height:1.7;color:#c2d2c4;margin-top:13px!important}
+.lp-launch{min-width:0}
+.lp-launch h3{font-size:29px;font-weight:500;letter-spacing:-.9px;line-height:1.3}
+.lp-launch ol{list-style:none;margin:26px 0 0;padding:0;display:grid;gap:22px}
+.lp-launch li{display:flex;align-items:flex-start;gap:17px}
+.lp-launch li>span{color:#76917b;font-size:11px;border-top:1px solid #ccd7c7;min-width:26px;padding-top:7px;line-height:1.5}
+.lp-launch li strong{font-size:14px;font-weight:600}
+.lp-launch li p{font-size:13px;line-height:1.8;color:#63776a;margin-top:5px;max-width:340px}
+.lp-print-check{display:flex;align-items:flex-start;gap:14px;border-top:1px solid #d7dfcf;padding-top:22px;margin-top:27px;color:#497365}
+.lp-print-check>svg{margin-top:2px}
+.lp-print-check strong{display:block;font-size:13px;color:#355c50}
+.lp-print-check p{font-size:12px;line-height:1.8;margin-top:7px;color:#63776a}
+.lp .lp-print-check a{display:inline-flex;gap:8px;align-items:center;font-size:12px;font-weight:600;min-height:44px;margin-top:3px}
+.lp-footer-links{flex-wrap:wrap}
+@media(max-width:1000px){.lp-subscription-grid{gap:36px}.lp-plan{padding:29px}.lp-plan-price strong{font-size:33px}.lp-plan-heading{font-size:8px}.lp-menu{gap:20px}}
+@media(max-width:800px){.lp .lp-mobile-plan{display:inline-flex}.lp-subscription-grid{gap:30px;align-items:start}.lp-plan{padding:25px}.lp-launch h3{font-size:25px}.lp-plan-heading{align-items:flex-start;flex-direction:column;gap:13px}.lp-plan h3{font-size:26px}.lp-plan ul{font-size:12px}.lp-plan-price strong{font-size:29px}.lp .lp-plan .lp-cta{font-size:12px;gap:10px}.lp-launch li{gap:11px}}
+@media(max-width:600px){
+ .lp-nav-access{gap:13px}.lp .lp-mobile-plan{font-size:10px}
+ .lp-subscription-grid{grid-template-columns:1fr;gap:35px;margin-top:27px}
+ .lp-plan{padding:27px 24px;border-radius:17px}.lp-plan-heading{flex-direction:row;align-items:center;font-size:8px;gap:12px}
+ .lp-plan h3{margin-top:22px;font-size:28px}.lp-plan-intro{font-size:12px}
+ .lp-plan-price{padding-block:23px}.lp-plan-price strong{font-size:35px}.lp-plan-price>span{font-size:11px}
+ .lp-plan ul{gap:13px;font-size:13px;padding-block:22px}.lp .lp-plan .lp-cta{font-size:13px;min-height:52px}
+ .lp-launch h3{font-size:27px}.lp-launch h3 br{display:none}.lp-launch ol{gap:20px;margin-top:23px}.lp-launch li{gap:15px}
+ .lp-launch li p{font-size:13px;max-width:none}.lp-print-check{padding-top:20px;margin-top:25px}
+ .lp-compact .lp-footer-links{gap:12px 20px}
+}
+@media(max-width:360px){.lp .lp-mobile-plan{font-size:9px}.lp-nav-access{gap:9px}.lp-compact .lp-entry{padding-inline:11px;font-size:11px}.lp-plan{padding:24px 20px}.lp-plan-heading{font-size:7px;letter-spacing:1px}.lp-plan-symbol{width:38px;height:38px}.lp-plan ul{font-size:12px}}
 @media(max-width:600px){
  .lp-compact .lp-nav{height:64px}.lp-compact .lp-entry{font-size:12px;padding:8px 14px}
  .lp-compact .lp-hero{padding-top:28px}.lp-compact .lp-hero-eyebrow{margin-bottom:16px}

@@ -1,5 +1,9 @@
 # Impressão: garçom ou cozinha
 
+Revisão de venda em 28/10/2026: o cenário prioritário é **cada garçom com a própria TC-163 portátil e o próprio Android/iPhone**. O modo cozinha abaixo é uma alternativa legada e não substitui esse requisito. A compatibilidade iPhone da unidade real ainda depende de identificar BLE/GATT e imprimir no papel; veja [matriz e fontes](./printing-research.md) e [passo a passo iPhone](./iphone-printing.md).
+
+O relatório Copiar compatibilidade para o suporte mostra as funções reais oferecidas pelo navegador e a confirmação de teste da conexão atual. Não compartilha credenciais ou comandas. Timeout/falha Serial agora interrompe os próximos blocos e fecha a conexão antiga depois da liberação da escrita; bytes já entregues ao hardware não podem ser desfeitos.
+
 O dono escolhe em Configurações → Onde os pedidos serão impressos.
 
 - Com o garçom: novos pedidos geram comandas atribuídas ao funcionário autenticado. Com a conexão direta testada, o botão Enviar e imprimir salva o pedido e já envia a comanda ao aparelho do garçom. A cozinha continua vendo o pedido, mas sua impressão automática não consome essa fila.

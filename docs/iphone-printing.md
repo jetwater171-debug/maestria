@@ -1,44 +1,32 @@
-# Impressão pelo iPhone
+# Impressora portátil no iPhone e iPad
 
-O site suporta transporte Web Bluetooth BLE em Bluefy/WebBLE. Safari e PWA
-não oferecem esse transporte. Não há confirmação física da TC-163 no iPhone.
-ESC/POS é o formato dos comandos; BLE e SPP são transportes diferentes.
+Revisado em 28/10/2026. O objetivo é cada garçom imprimir na TC-163 que leva consigo. Essa unidade ainda não foi homologada fisicamente no iPhone. A caixa/manual recuperados mencionam iPhone, mas não identificam o transporte GATT/SDK; o autoteste informa JK-5801P, KPrinter_523c, BT e USB. Isso não permite afirmar nem excluir BLE.
 
-## Operação
+## Caminho direto a verificar
 
-1. Desconectar a impressora do notebook e de outros aplicativos.
-2. Abrir o site HTTPS no Bluefy/WebBLE e permitir Bluetooth.
-3. Cozinha → Impressão automática → Configurar → Conectar por Bluetooth BLE.
-4. Selecionar a impressora e imprimir um teste; confirmar no papel.
-5. Ativar automático e manter a cozinha visível, com a tela ligada.
+1. Carregue a impressora, coloque papel e desconecte de outros aparelhos/apps.
+2. Abra o Maestria por HTTPS no [Bluefy](https://apps.apple.com/app/id1492822055), que oferece Web Bluetooth BLE; permita Bluetooth.
+3. Use o acesso individual do garçom. A configuração oferece copiar esse acesso para abrir no Bluefy, sem colocar credenciais Supabase no link.
+4. Configurar impressora → Buscar impressora BLE. Se a unidade aparecer e o canal for identificado, envie o teste e confirme **somente após ver o texto no papel**.
+5. Com o dono tendo escolhido impressão com o garçom, toque Enviar e imprimir. A comanda é reservada e enviada depois de o pedido ser salvo; cada funcionário tem a própria fila.
+6. Mantenha o site aberto e a tela ativa durante o envio. Tela bloqueada, segundo plano e bateria precisam de teste real; não há garantia de serviço web em segundo plano.
 
-A mesma fila autenticada, reserva e confirmação atende BLE, Serial e impressão
-manual. Falhas de envio deixam a comanda incerta, sem repetição automática.
-Blocos de 20 bytes com intervalo de 50 ms evitam depender de um MTU maior.
-O limite de envio é 40 segundos. O teste no papel é necessário mesmo quando
-o navegador confirma que os bytes foram enviados.
+Se não aparecer no seletor, confira permissões, energia e conexões concorrentes. Um scanner BLE pode ajudar a identificar serviço/canal; o painel avançado aceita UUIDs confirmados pelo fabricante. Ausência no primeiro scan, sozinha, não prova que o hardware é Classic.
 
-Perfis: ISSC UART, FF00/FF02, FFE0/FFE1, 18F0/2AF1. UUIDs diferentes podem
-ser informados em Configuração avançada, se confirmados pelo fabricante.
-A seleção aceita dispositivos BLE sem filtrar pelo nome comercial. Serviços
-precisam estar autorizados em optionalServices. O diagnóstico só mostra os
-serviços autorizados; não é um inventário de todos os serviços do dispositivo.
-Canais desconhecidos não recebem comandos. A detecção de um perfil não
-garante que o firmware aceite ESC/POS: o teste físico valida isso.
+O transporte autoriza perfis ISSC UART, FF00/FF02, FFE0/FFE1 e 18F0/2AF1; somente canais de escrita reconhecidos recebem comandos. O diagnóstico mostra serviços autorizados, não todos os serviços existentes. Um perfil encontrado ainda precisa aceitar ESC/POS e passar no papel. Blocos de 20 bytes e intervalo de 50 ms evitam depender de um MTU maior; limite de envio de 40 segundos.
 
-## Referências analisadas
+## Safari, apps e Classic
 
-- https://github.com/daphtdazz/WebBLE — polyfill GATT e métodos de escrita.
-- https://github.com/joshmcarthur/yhk-mini-printer — transporte Web Bluetooth,
-  UUID ISSC, fragmentação e ponte iOS; hardware YHK, não TC-163.
-- https://github.com/kevinfavv/CapacitorThermalPrinter — BleTransport.swift,
-  perfis de descoberta e restrições de SPP no iOS.
-- https://github.com/qzind/tray — alternativa com servidor intermediário;
-  não é um transporte Bluetooth direto no iPhone.
-- https://github.com/cicloid/printable — protocolos de outros modelos e
-  ponte AirPrint; não comprova compatibilidade TC-163.
+Safari comum e o ícone PWA não devem ser tratados como navegadores com BLE/Serial. O site verifica as APIs reais. A [extensão beacio](https://apps.apple.com/br/app/beacio/id6761301368) é alternativa experimental para **BLE**, com app/extensão e iOS 26.2+ na versão consultada. Não adiciona Bluetooth ao PWA nem transforma SPP em GATT.
 
-Implementação própria baseada nas APIs e perfis documentados. Nenhum SDK
-nativo, aplicativo de terceiros ou código de protocolo proprietário foi
-incorporado. Se a unidade for apenas Classic SPP, usar a central no MacBook
-que já foi testada, ou validar outro hardware com BLE compatível.
+Se a unidade tiver apenas Classic SPP sem integração iOS compatível, instalar um navegador BLE não resolve. O suporte nativo [Core Bluetooth Classic da Apple](https://developer.apple.com/videos/play/wwdc2019/901/) usa GATT sobre BR/EDR; não oferece uma porta RFCOMM genérica ao JavaScript do Safari. Obter SDK do fabricante ou validar outro transporte/hardware é necessário antes de vender essa compatibilidade.
+
+[AirPrint](https://support.apple.com/pt-br/109349) depende de impressora compatível na mesma rede e abre o diálogo do sistema. BT/USB no autoteste da TC-163 não comprova AirPrint. [Star webPRNT](https://www.star-m.jp/products/s_print/sdk/webprnt/manual/en/_sampleProgram.htm) é um caminho comercial para modelos Star suportados, não driver genérico desta impressora.
+
+Server for RawBT é um serviço Android. Usá-lo a partir de iPhone exigiria uma ponte/aparelho adicional e rede; não resolve o iPhone sozinho. Uma central na cozinha não satisfaz a exigência da impressora portátil individual.
+
+## Conferência e suporte
+
+Falhas de escrita e confirmação perdida ficam incertas; não repetir automaticamente. `sent` é envio ao transporte, não prova de papel. Depois de desconectar/reconectar, o teste precisa ser confirmado novamente.
+
+O botão Copiar compatibilidade para o suporte informa contexto seguro, APIs disponíveis, conexão e teste confirmado, sem incluir tokens, links de funcionário ou pedidos. A [pesquisa comparativa](./printing-research.md) registra opções, fontes e roteiro de homologação Android/iPhone.

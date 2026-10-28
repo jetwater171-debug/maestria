@@ -35,11 +35,34 @@ export function escposBytes(content:string){
 async function sendReceipt(content:string){
  if(bleAvailable()){await sendBleBytes(escposBytes(content));return;}
  if(!port?.writable)throw Error('Conecte a impressora primeiro.');
- const writer=port.writable.getWriter();
+ const current=port;
+ const writer=current.writable!.getWriter();
+ let interrupted=false;
  let timer:ReturnType<typeof setTimeout>|undefined;
+ const interruption=()=>Error('Envio interrompido. Confira o papel antes de reimprimir.');
+ // A timed-out write may still settle later. Keep its lock until it settles and
+ // stop the loop before another chunk; never let it continue on a new session.
+ const transfer=(async()=>{
+  try{
+   const bytes=escposBytes(content);
+   for(let i=0;i<bytes.length;i+=128){
+    if(interrupted)throw interruption();
+    await writer.write(bytes.slice(i,i+128));
+    if(interrupted)throw interruption();
+    await new Promise(r=>setTimeout(r,30));
+   }
+  }finally{writer.releaseLock()}
+ })();
  try{
-  await Promise.race([(async()=>{const bytes=escposBytes(content);for(let i=0;i<bytes.length;i+=128){await writer.write(bytes.slice(i,i+128));await new Promise(r=>setTimeout(r,30))}})(),new Promise<never>((_,reject)=>{timer=setTimeout(()=>{void writer.abort().catch(()=>{});reject(Error('Envio interrompido. Confira o papel antes de reimprimir.'))},40000)})]);
- }catch(e){port=null;notifyPrinterChange(true);throw e}finally{clearTimeout(timer);writer.releaseLock()}
+  await Promise.race([transfer,new Promise<never>((_,reject)=>{timer=setTimeout(()=>{interrupted=true;void writer.abort().catch(()=>{});reject(interruption())},40000)})]);
+ }catch(e){
+  interrupted=true;
+  if(port===current){port=null;notifyPrinterChange(true)}
+  // Closing a locked SerialPort fails. Clean up only after the outstanding
+  // transfer has released its writer, without blocking the error shown to staff.
+  void transfer.catch(()=>{}).then(()=>current.close()).catch(()=>{});
+  throw e;
+ }finally{clearTimeout(timer)}
 }
 
 let sending=false;

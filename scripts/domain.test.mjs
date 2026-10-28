@@ -1,8 +1,28 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createState,applyAction,subtotal} from '../lib/domain.ts';
+import {publicWorkspace} from '../lib/workspace-view.ts';
 const act=(s,a,role='owner')=>applyAction(s,{id:crypto.randomUUID(),...a},role,'Teste');
 function fixture(){let s=createState('Teste','Praia',2);return act(s,{type:'product',products:[{id:'p',name:'Água',category:'Bebidas',price:750,station:'bar',available:true}]})}
+
+test('histórico de estoque e recebimentos respeita a função também na resposta da API',()=>{
+ const state=fixture();
+ state.stockMovements=[{id:'internal',productId:'p',quantity:10,reason:'Ajuste gerencial',createdAt:'2026-10-28T12:00:00Z',author:'Dono'}];
+ state.settlements={closed:{subtotal:10000,service:1000,discount:0,total:11000}};
+ state.payments=[{id:'payment',session:'closed',tableName:'Mesa 01',subtotal:10000,service:1000,discount:0,total:11000,method:'Pix',createdAt:'2026-10-28T12:00:00Z'}];
+ for(const role of ['waiter','kitchen']){
+  const view=publicWorkspace(state,role);
+  assert.deepEqual(view.stockMovements,[]);
+  assert.deepEqual(view.settlements,{});
+  assert.deepEqual(view.payments,[]);
+ }
+ const cashier=publicWorkspace(state,'cashier');
+ assert.deepEqual(cashier.settlements,state.settlements);
+ assert.deepEqual(cashier.payments,state.payments);
+ assert.deepEqual(cashier.stockMovements,[]);
+ assert.deepEqual(publicWorkspace(state,'owner').stockMovements,state.stockMovements);
+ assert.equal(state.stockMovements.length,1);
+});
 test('pedido usa preço do servidor e retry não duplica',()=>{let s=fixture();const a={id:'unique',type:'order',tableId:s.tables[0].id,items:[{productId:'p',quantity:2,price:1}]};s=act(s,a,'waiter');assert.equal(subtotal(s,s.tables[0]),1500);s=act(s,a,'waiter');assert.equal(s.orders.length,1)});
 test('caixa só fecha após entrega, serviço removível, mesa reutilizável',()=>{let s=fixture();const tableId=s.tables[0].id;s=act(s,{type:'order',tableId,items:[{productId:'p',quantity:3}]});const orderId=s.orders[0].id;s=act(s,{type:'closing',tableId});assert.throws(()=>act(s,{type:'checkout',tableId,withService:false,discount:0,method:'Pix'}),/pendentes/);s=act(s,{type:'status',orderId,status:'preparing'},'kitchen');s=act(s,{type:'status',orderId,status:'ready'},'kitchen');s=act(s,{type:'status',orderId,status:'delivered'},'waiter');s=act(s,{type:'checkout',tableId,withService:false,discount:250,method:'Pix'});assert.equal(s.payments[0].total,2000);assert.equal(s.tables[0].session,null);s=act(s,{type:'order',tableId,items:[{productId:'p',quantity:1}]});assert.equal(subtotal(s,s.tables[0]),750);assert.equal(s.payments.length,1)});
 test('permissões e item indisponível são validados no servidor',()=>{let s=fixture();assert.throws(()=>act(s,{type:'settings',name:'x',location:'y',service:10},'waiter'),/acesso/);s=act(s,{type:'availability',productId:'p',available:false});assert.throws(()=>act(s,{type:'order',tableId:s.tables[0].id,items:[{productId:'p',quantity:1}]},'waiter'),/disponível/)});

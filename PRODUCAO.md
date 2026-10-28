@@ -28,6 +28,14 @@ Dados anteriores do D1 NÃO são migrados automaticamente. O estado por barraca 
 
 Não considerar produção aprovada só pelo build: testar no domínio publicado com Supabase real e dois aparelhos. Nunca usar os antigos testes HTTP D1 como comprovação de integração Supabase.
 
+## Administração do SaaS e preparação de venda
+
+O acesso `/admin` usa senha administrativa privada e sessão protegida. Configure `SAAS_ADMIN_PASSWORD` e `SAAS_ADMIN_SESSION_SECRET` no servidor; a segunda precisa de pelo menos 32 caracteres aleatórios. Não use prefixo `NEXT_PUBLIC`. Consulte `docs/saas-admin.md` para autenticação, limites e cobrança manual.
+
+O roteiro de implantação, critérios para impressão individual e decisões comerciais está em `docs/preparacao-venda.md`. A oferta pública permanece sob consulta até o preço ser definido. As cobranças do painel não debitam cartões ou Pix automaticamente.
+
+Após esta atualização, abra o painel uma vez com internet no mesmo navegador que será usado offline. A configuração pública de autenticação pode ser recuperada localmente em falhas de rede; um erro explícito de configuração do servidor não é substituído por configuração antiga.
+
 ## TC-163 — impressão automática com a cozinha aberta
 
 Pareie a impressora Bluetooth Classic/SPP nas configurações do aparelho. Abra a Cozinha no Chrome atualizado do Android (138+) ou no Chrome/Edge do notebook. Toque em **Conectar impressora**, escolha a TC-163 e depois **Ativar**. Não é necessário aplicativo auxiliar nesses navegadores com `navigator.serial` disponível.

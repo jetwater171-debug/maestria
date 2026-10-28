@@ -13,6 +13,30 @@ A impressão é descrita como dependente do equipamento e conexão.
 Sem depoimentos, métricas de clientes, preços ou garantias de resultados inventados.
 A demonstração é local e sinalizada como fictícia; não envia pedidos reais.
 
+## Assinatura e preparação para venda
+
+A seção `#assinatura` apresenta uma oferta única Maestria Beach com os recursos
+existentes de mesas, pedidos, cozinha, caixa, cardápio, estoque, equipe, resumo
+e fila offline. O preço permanece **Sob consulta**, pois o valor e as condições
+comerciais ainda não foram definidos. Não há planos fictícios, limites de uso
+inventados, promessa de teste grátis com prazo ou checkout de assinatura.
+
+O botão “Criar conta e conhecer” usa o cadastro real em
+`/painel?cadastro=1`. Ele não ativa uma mensalidade nem cobra automaticamente.
+O plano, vencimento e valor continuam configuráveis no painel administrativo.
+
+Ao lado da oferta, os primeiros passos explicam cadastro da operação, acesso
+da equipe e teste do fluxo completo. A impressão portátil tem um aviso próprio:
+validar o conjunto exato de celular e impressora, com papel saindo, antes de
+contratar para esse uso. O texto não promete compatibilidade com toda TC-163,
+todo Android, Safari ou toda impressora Bluetooth. A FAQ explica a possibilidade
+de aplicativo auxiliar e toque extra, preservando a impressora com o garçom.
+
+O cabeçalho inclui o acesso à assinatura em desktop e celular. As oito dúvidas
+cobrem equipamento, equipe, cardápio, internet, impressão, pagamento, configuração
+e assinatura. Os pagamentos registrados no caixa são diferenciados da cobrança
+do SaaS; o produto não é anunciado como gateway nem emissor fiscal.
+
 ## Imagem
 
 Ferramenta nativa de geração de imagens, arquivo otimizado em
@@ -37,4 +61,8 @@ Prompt utilizado:
 
 ## Versão compacta
 
-Cinco seções: abertura, benefícios, demonstração, três dúvidas essenciais e cadastro. Removidas as seções redundantes de problemas, faixa de recursos, scanner e configuração; scanner e primeiros passos continuam explicados em blocos curtos. Benefícios aparecem antes da demonstração. No viewport de 390 × 844, a altura caiu de 7.752 para 3.481 px (55%). Demonstração e largura de 320 px verificadas no navegador.
+A base compacta usa abertura, benefícios, demonstração e cadastro, com a oferta
+de assinatura e dúvidas completas acrescentadas para a venda. Foram mantidos
+os benefícios antes da demonstração e removidas seções redundantes. A medida
+anterior de 3.481 px de altura pertencia à versão com apenas três dúvidas,
+antes da seção de assinatura; não descreve a versão atual.

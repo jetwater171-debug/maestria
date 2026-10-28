@@ -1,4 +1,7 @@
--- Execute no SQL Editor do projeto Supabase de destino.-- Não apaga dados. Para migrar, preserve primeiro auth.users e seus UUIDs.-- db/schema.ts e drizzle/ são legado SQLite: não usar no Supabase.begin;
+-- Execute no SQL Editor do projeto Supabase de destino.
+-- Não apaga dados. Para migrar, preserve primeiro auth.users e seus UUIDs.
+-- db/schema.ts e drizzle/ são legado SQLite: não usar no Supabase.
+begin;
 create table if not exists public.venues (
  owner uuid primary key references auth.users(id) on delete cascade,
  state jsonb not null,
@@ -19,4 +22,5 @@ alter table public.accesses enable row level security;
 alter table public.printers enable row level security;
 -- Navegador não altera estado operacional diretamente. API valida identidade e função.
 revoke all on public.venues, public.accesses, public.printers from public, anon, authenticated;
-grant select, insert, update, delete on public.venues, public.accesses, public.printers to service_role;commit;
+grant select, insert, update, delete on public.venues, public.accesses, public.printers to service_role;
+commit;
