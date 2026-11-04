@@ -1,7 +1,7 @@
 import {assertSubscription} from '@/lib/saas-billing';
 import {resolveAccess} from '@/lib/access';
 import {readVenue,saveVenue} from '@/lib/db';
-import {claimLocalJob,finishLocalJob} from '@/lib/local-print-queue';
+import {claimLocalJob,finishLocalJob,touchLocalJob} from '@/lib/local-print-queue';
 import {printScope,copyPrintJob} from '@/lib/print-access';
 import {registerHub,touchHub,releaseHub,requestHubPrint,hubJobs} from '@/lib/print-hub';
 import {z} from 'zod';
@@ -12,7 +12,7 @@ export async function POST(req:Request){
   const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)return respond({error:'Origem inválida.'},403);
   const access=await resolveAccess(req);if(!access||!['owner','kitchen','waiter'].includes(access.role))return respond({error:'Acesso não autorizado.'},403);
   if(Number(req.headers.get('content-length')||0)>2000)throw Error('Pedido inválido.');
-  const b=z.object({type:z.enum(['arm','claim','finish','relay','release','heartbeat']),hub:z.boolean().optional(),deviceId:z.string().min(1).max(80),claimToken:z.string().min(1).max(80),since:z.string().optional(),jobId:z.string().max(100).optional(),success:z.boolean().optional(),reprint:z.boolean().optional()}).parse(await req.json());
+  const b=z.object({type:z.enum(['arm','claim','finish','relay','release','heartbeat','touch']),hub:z.boolean().optional(),deviceId:z.string().min(1).max(80),claimToken:z.string().min(1).max(80),since:z.string().optional(),jobId:z.string().max(100).optional(),success:z.boolean().optional(),reprint:z.boolean().optional()}).parse(await req.json());
   if(b.type==='heartbeat'&&!b.hub)throw Error('Identifique a central de impressão.');
   if(b.type==='claim'&&(!b.since||!Number.isFinite(Date.parse(b.since))||Date.parse(b.since)>Date.now()+30000))throw Error('Horário inválido.');
   if((b.hub||b.type==='release')&&!['owner','kitchen'].includes(access.role))throw Error('Somente a cozinha pode ativar uma central.');
@@ -55,6 +55,9 @@ export async function POST(req:Request){
      const eligibleSince=b.hub?'2000-01-01T00:00:00Z':b.since!;
      const eligible=b.hub?scope.filter(j=>j.status==='printing'||j.relay?.hubId===b.deviceId||j.createdAt>=b.since!):scope;
      result={job:claimLocalJob(eligible,b.deviceId,b.claimToken,eligibleSince,now,id)};
+    }else if(b.type==='touch'){
+     if(!b.jobId)throw Error('Selecione uma comanda.');
+     touchLocalJob(scope,b.deviceId,b.claimToken,b.jobId,now);result={renewed:true};
     }else{
      if(typeof b.jobId!=='string'||typeof b.success!=='boolean')throw Error('Confirmação inválida.');
      finishLocalJob(scope,b.deviceId,b.claimToken,b.jobId,b.success);

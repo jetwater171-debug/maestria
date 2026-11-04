@@ -1,5 +1,13 @@
 # Impressão: garçom ou cozinha
 
+## Revisão de 04/11/2026
+
+O requisito vigente é TC-163 individual com o garçom, sem adaptador. RawBT foi retirado das opções da interface. No Android, a alternativa Open ESC/POS exige um toque para abrir cada comanda após salvar; o envio automático usa a conexão Serial/BLE testada. A alternativa escolhida não bloqueia mais o envio do pedido. A confirmação no iPhone continua dependendo de BLE/GATT na unidade real.
+
+`/impressora` oferece configuração e teste neste aparelho. Quem já tem acesso pode enviar voluntariamente um diagnóstico de recursos, conexão e teste para o suporte do Maestria. O servidor identifica o funcionário, guarda somente o último relatório e não recebe conteúdo de pedido nesse diagnóstico.
+
+Os transportes passaram a medir escrita parada em vez do tempo total da comanda. Durante envio direto autenticado, a reserva privada é renovada a cada 15 segundos. Perder a renovação interrompe os próximos blocos e deixa a comanda para conferência, sem repetir bytes. As seções anteriores abaixo registram a evolução histórica; a pesquisa vigente está em `printing-research-2026-11.md`.
+
 Revisão de venda em 28/10/2026: o cenário prioritário é **cada garçom com a própria TC-163 portátil e o próprio Android/iPhone**. O modo cozinha abaixo é uma alternativa legada e não substitui esse requisito. A compatibilidade iPhone da unidade real ainda depende de identificar BLE/GATT e imprimir no papel; veja [matriz e fontes](./printing-research.md) e [passo a passo iPhone](./iphone-printing.md).
 
 O relatório Copiar compatibilidade para o suporte mostra as funções reais oferecidas pelo navegador e a confirmação de teste da conexão atual. Não compartilha credenciais ou comandas. Timeout/falha Serial agora interrompe os próximos blocos e fecha a conexão antiga depois da liberação da escrita; bytes já entregues ao hardware não podem ser desfeitos.

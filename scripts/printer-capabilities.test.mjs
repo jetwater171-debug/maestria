@@ -98,12 +98,12 @@ test('impressora conectada vence preferência antiga de aplicativo no Android',(
  const caps=getPrinterCapabilities({userAgent:'Android Chrome',secureContext:true,serial:{requestPort:()=>{}}});
  assert.equal(preferredReceiptMethod(caps,true,'rawbt'),'direct');
  assert.equal(preferredReceiptMethod(caps,false,null),'direct');
- assert.equal(preferredReceiptMethod(caps,false,'rawbt'),'rawbt');
+ assert.equal(preferredReceiptMethod(caps,false,'rawbt'),'direct');
 });
 test('preferência direta indisponível cai para o tutorial apropriado, nunca RawBT no iPhone',()=>{
  const android=getPrinterCapabilities({userAgent:'Android',secureContext:true});
  const ios=getPrinterCapabilities({userAgent:'iPhone',secureContext:true,systemPrint:()=>{}});
- assert.equal(preferredReceiptMethod(android,false,'direct'),'rawbt');assert.equal(preferredReceiptMethod(ios,false,'rawbt'),'system');
+ assert.equal(preferredReceiptMethod(android,false,'direct'),'openescpos');assert.equal(preferredReceiptMethod(ios,false,'rawbt'),'system');
 });
 test('nova conexão invalida confirmação do papel; trocar preferência não invalida',()=>{
  notifyPrinterChange(true);const version=printerConnectionRevision();assert.equal(printerTestConfirmed(),false);

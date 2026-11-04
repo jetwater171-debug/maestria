@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {publicWorkspace} from '../lib/workspace-view.ts';
 import {createState,applyAction} from '../lib/domain.ts';
 import {applyBilling,canAdmin,invoiceStatus,assertSubscription,csvCell} from '../lib/saas-billing.ts';
-import {venueHealth} from '../lib/saas-health.ts';
+import {venueHealth,printingDiagnostics,assertSupportJobs} from '../lib/saas-health.ts';
 import {AdminRequestError,readAdminBody} from '../lib/saas-admin-request.ts';
 import {ADMIN_COOKIE,ADMIN_SESSION_SECONDS,AdminLoginLimiter,adminClientIp,adminSessionCookie,checkAdminPassword,createAdminSession,hasAdminSession,sameAdminOrigin,validAdminSession} from '../lib/saas-admin-auth.ts';
 const now='2026-09-29T12:00:00Z';const act=(s,a)=>applyBilling(s,{id:crypto.randomUUID(),...a},'admin',now);
@@ -125,4 +125,79 @@ test('limite de login restringe IP e volume global por instância',()=>{
  for(let i=0;i<60;i++)assert.equal(global.allow('client-'+i,1000).allowed,true);
  assert.equal(global.allow('another-client',1000).allowed,false);
  assert.equal(global.allow('another-client',61001).allowed,true);
+});
+
+test('diagnóstico administrativo pagina e filtra sem expor conteúdo ou reserva de impressão',()=>{
+ const state=createState('Barraca','Praia',2),at='2026-11-04T15:00:00Z';
+ state.employees=[{id:'waiter-a',name:'Ana',role:'waiter',active:true},{id:'waiter-b',name:'Bia',role:'waiter',active:false}];
+ state.orders=[{id:'order-a',tableId:state.tables[0].id,session:'session',lines:[],note:'private-note',status:'new',createdAt:at,author:'Ana',employeeId:'waiter-a'}];
+ state.printJobs=Array.from({length:25},(_,i)=>({id:'job-'+String(i).padStart(2,'0'),orderId:'order-a',employeeId:'waiter-a',destination:'waiter',status:i===24?'sent':'queued',createdAt:at,content:'private-receipt',claimToken:'private-reservation',deviceId:'private-device'}));
+ state.printJobs.push({id:'kitchen-job',orderId:'other',employeeId:'waiter-b',destination:'kitchen',status:'failed',createdAt:at,error:'printer disconnected',content:'private-receipt'});
+ const original=structuredClone(state),first=printingDiagnostics(state,{status:'all'},at),second=printingDiagnostics(state,{status:'all',page:'2'},at);
+ assert.equal(first.total,26);assert.equal(first.jobs.length,20);assert.equal(first.pages,2);assert.equal(second.jobs.length,6);
+ assert.equal(new Set([...first.jobs,...second.jobs].map(job=>job.id)).size,26);
+ const employee=printingDiagnostics(state,{status:'all',employee:'waiter-a',destination:'waiter',query:'Ana'},at);
+ assert.equal(employee.total,25);assert.equal(employee.staff.find(member=>member.id==='waiter-a').queued,24);
+ assert.equal(employee.staff.find(member=>member.id==='waiter-b').active,false);
+ assert.equal(employee.jobs[0].otherCopies,24);
+ assert.equal(printingDiagnostics(state,{status:'sent'},at).total,1);
+ assert.equal(printingDiagnostics(state,{status:'all',query:'printer disconnected'},at).total,1);
+ assert.equal(printingDiagnostics(state,{status:'all',page:'99'},at).page,2);
+ for(const value of ['private-receipt','private-reservation','private-device','private-note'])assert.equal(JSON.stringify(first).includes(value),false);
+ for(const filter of [{status:'bad'},{destination:'bad'},{page:'0'},{page:'Infinity'},{query:'x'.repeat(121)}])assert.throws(()=>printingDiagnostics(state,filter,at));
+ assert.deepEqual(state,original);
+});
+
+test('suporte vê diagnósticos voluntários com autor e distingue capturas antigas',()=>{
+ const state=createState('Barraca','Praia',1),at='2026-11-04T15:00:00Z';
+ state.employees=[{id:'waiter-a',name:'Ana',role:'waiter',active:true}];
+ const report={platform:'android',browser:'chrome',secureContext:true,directSerial:false,directBle:true,connected:false,verified:false,transport:'none',method:'direct',result:'connection-failed'};
+ state.printerDiagnostics=[{...report,id:'new-report',actorId:'waiter-a',role:'waiter',receivedAt:at},{...report,id:'old-report',actorId:'owner',role:'owner',receivedAt:'2026-11-01T15:00:00Z'}];
+ const result=printingDiagnostics(state,{},at);
+ assert.deepEqual(result.deviceReports.map(report=>report.actorName),['Ana','Dono']);
+ assert.match(result.health.issues.find(issue=>issue.id==='device-report').detail,/1 aparelho/);
+ assert.equal(publicWorkspace(state,'waiter').printerDiagnostics,undefined);
+});
+
+test('atendimento interno é idempotente, auditado e não altera a fila ou finanças',()=>{
+ const state=createState('Barraca','Praia',1),beforeJobs=[{id:'job-a',orderId:'order-a',status:'uncertain',createdAt:now,content:'private-receipt'}];
+ state.printJobs=structuredClone(beforeJobs);state.saas=fixture();
+ const open={id:'support-1',type:'supportOpen',subject:'Impressora do garçom',note:'Conferir conexão com Ana.',jobIds:['job-a','job-a']};
+ assertSupportJobs(state,open);
+ state.saas=applyBilling(state.saas,open,'Administrador',now);state.saas=applyBilling(state.saas,open,'Administrador',now);
+ assert.equal(state.saas.supportCases.length,1);assert.deepEqual(state.saas.supportCases[0].jobIds,['job-a']);
+ assert.equal(state.saas.supportCases[0].entries.length,1);assert.equal(state.saas.monthlyFee,14900);
+ assert.ok(venueHealth(state,now).issues.some(issue=>issue.id==='support'));
+ const closed=applyBilling(state.saas,{id:'close-1',type:'supportUpdate',caseId:'support-1',status:'resolved',note:'Responsável conferiu o equipamento no local.'},'Administrador',now);
+ state.saas=closed;assert.equal(closed.supportCases[0].status,'resolved');assert.equal(closed.supportCases[0].entries.length,2);
+ assert.ok(!venueHealth(state,now).issues.some(issue=>issue.id==='support'));
+ assert.ok(venueHealth(state,now).issues.some(issue=>issue.id==='uncertain'));
+ state.saas=applyBilling(closed,{id:'reopen-case',type:'supportUpdate',caseId:'support-1',status:'open',note:'Cliente informou nova ocorrência.'},'Administrador',now);
+ assert.equal(state.saas.supportCases[0].status,'open');assert.equal(state.saas.supportCases[0].entries.length,3);
+ assert.deepEqual(state.printJobs,beforeJobs);assert.equal(state.saas.invoices.length,0);
+ assert.match(state.saas.audit.at(-1).action,/Atendimento atualizado/);
+ for(const role of ['owner','waiter','kitchen','cashier'])assert.equal('saas' in publicWorkspace(state,role),false);
+});
+
+test('suporte rejeita comandas de outra barraca, notas vazias e transições inválidas',()=>{
+ const state=createState('Barraca','Praia',1);state.printJobs=[{id:'local-job',orderId:'local-order',status:'queued',createdAt:now,content:''}];
+ assert.throws(()=>assertSupportJobs(state,{type:'supportOpen',jobIds:['foreign-job']}),/não pertence/);
+ assert.throws(()=>assertSupportJobs(state,{type:'supportOpen',jobIds:'local-job'}));
+ const s=act(fixture(),{type:'supportOpen',subject:'Atendimento',note:'Verificar no local.',jobIds:[]});
+ const caseId=s.supportCases[0].id;
+ assert.throws(()=>act(s,{type:'supportOpen',subject:'Atendimento',note:'',jobIds:[]}));
+ assert.throws(()=>act(s,{type:'supportUpdate',caseId,status:'resolved',note:''}));
+ assert.throws(()=>act(s,{type:'supportUpdate',caseId,status:'printed',note:'No local.'}));
+ assert.throws(()=>act(fixture(),{type:'supportUpdate',caseId,status:'resolved',note:'Outra barraca.'}),/não encontrado/);
+ assert.equal(s.supportCases[0].status,'open');assert.equal(s.supportCases[0].entries.length,1);
+});
+
+test('envio longo com heartbeat recente não gera falso alerta de reserva parada',()=>{
+ const state=createState('Barraca','Praia',1),at='2026-11-04T15:00:00Z';
+ state.printJobs=[{id:'long-job',orderId:'test',status:'printing',content:'private',createdAt:'2026-11-04T14:40:00Z',claimedAt:'2026-11-04T14:45:00Z',claimHeartbeatAt:'2026-11-04T14:59:45Z'}];
+ assert.equal(venueHealth(state,at).stalled,0);
+ assert.equal(printingDiagnostics(state,{},at).jobs[0].claimHeartbeatAt,'2026-11-04T14:59:45Z');
+ assert.equal(venueHealth(state,'2026-11-04T15:02:00Z').stalled,1);
+ delete state.printJobs[0].claimHeartbeatAt;
+ assert.equal(venueHealth(state,at).stalled,1);
 });

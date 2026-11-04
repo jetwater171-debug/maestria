@@ -5,7 +5,7 @@ import {scanRequest,parseScan} from '../lib/scanner.ts';
 import {createState,applyAction} from '../lib/domain.ts';
 import {androidPrintIntent} from '../lib/android-print.ts';
 import {gunzipSync} from 'node:zlib';
-import {connectBlePrinter,disconnectBlePrinter,bleAvailable,bleDiagnostic,bleUuid,BLE_PROFILES} from '../lib/ble-printer.ts';
+import {connectBlePrinter,disconnectBlePrinter,sendBleBytes,bleAvailable,bleDiagnostic,bleUuid,BLE_PROFILES} from '../lib/ble-printer.ts';
 import {printKitchenReceipt} from '../lib/kitchen-printer.ts';
 
 test('BLE iPhone descobre canal autorizado, envia ESC/POS em blocos e limpa desconexão',async()=>{
@@ -20,7 +20,71 @@ test('BLE não envia comandos a canal desconhecido e rejeita UUID inválido ante
  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>{requests++;return device}}}});
  try{await assert.rejects(connectBlePrinter(),/canal de impressão/);assert.equal(writes,0);assert.equal(bleAvailable(),false);await assert.rejects(connectBlePrinter({service:'bad uuid',characteristic:'ff02'}),/UUID inválido/);assert.equal(requests,1);assert.equal(bleUuid('FF00'),'0000ff00-0000-1000-8000-00805f9b34fb')}finally{if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}
 });
-import {claimLocalJob,finishLocalJob} from '../lib/local-print-queue.ts';
+
+function mockBleDevice(services,name='Portátil de teste'){
+ const listeners=[];const device={name,listeners,gatt:{connected:false,connect:async()=>{device.gatt.connected=true;return {getPrimaryServices:async()=>services}},disconnect:()=>{device.gatt.connected=false}},addEventListener:(name,callback)=>{if(name==='gattserverdisconnected')listeners.push(callback)}};
+ return device;
+}
+async function withTransportClock(work){
+ const realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout,timers=new Map();let id=0,now=0,done=false,result,error;
+ globalThis.setTimeout=(callback,delay=0,...args)=>{const key=++id;timers.set(key,{at:now+delay,callback:()=>callback(...args)});return key};
+ globalThis.clearTimeout=key=>{timers.delete(key)};
+ try{
+  void Promise.resolve().then(work).then(value=>{result=value;done=true},reason=>{error=reason;done=true});
+  for(let ticks=0;!done&&ticks<10000;ticks++){
+   for(let microtasks=0;microtasks<20;microtasks++)await Promise.resolve();
+   if(done)break;
+   const next=[...timers].sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];
+   assert.ok(next,'A operação deve terminar ou ter um temporizador ativo.');
+   timers.delete(next[0]);now=next[1].at;next[1].callback();
+  }
+  assert.equal(done,true,'A operação deve terminar dentro do limite do teste.');if(error)throw error;return {result,elapsed:now};
+ }finally{globalThis.setTimeout=realSetTimeout;globalThis.clearTimeout=realClearTimeout;}
+}
+
+test('BLE mantém prioridade dos perfis mesmo com ordem invertida e serviço inacessível',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),writes=[];
+ const services=[...BLE_PROFILES].reverse().map(profile=>({uuid:profile.service,getCharacteristics:async()=>[{uuid:profile.characteristic,properties:{write:true,writeWithoutResponse:true},writeValueWithResponse:async()=>{writes.push(profile.service)},writeValueWithoutResponse:async()=>{throw Error('Não deve preferir escrita sem resposta quando há resposta.')}}]}));
+ services.splice(1,0,{uuid:'00001800-0000-1000-8000-00805f9b34fb',getCharacteristics:async()=>{throw Error('Serviço sem permissão')}});
+ const device=mockBleDevice(services);Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>device}}});
+ try{await connectBlePrinter();assert.match(bleDiagnostic(),/não foi possível consultar/);await sendBleBytes(new Uint8Array([1,2]));assert.deepEqual(writes,[BLE_PROFILES[0].service]);}finally{await disconnectBlePrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+
+test('BLE usa escrita legada disponível sem escolher resposta proibida pelo perfil',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');let writes=0;const profile=BLE_PROFILES[0];
+ const device=mockBleDevice([{uuid:profile.service,getCharacteristics:async()=>[{uuid:profile.characteristic,properties:{writeWithoutResponse:true},writeValueWithResponse:async()=>{throw Error('Resposta não suportada pelo canal')},writeValue:async()=>{writes++}}]}]);
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>device}}});
+ try{await connectBlePrinter();await sendBleBytes(new Uint8Array([1]));assert.equal(writes,1);}finally{await disconnectBlePrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+
+test('comanda BLE longa completa todos os bytes depois de quarenta segundos saudáveis',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),writes=[],profile=BLE_PROFILES[0];
+ const device=mockBleDevice([{uuid:profile.service,getCharacteristics:async()=>[{uuid:profile.characteristic,properties:{writeWithoutResponse:true},writeValueWithoutResponse:async bytes=>{writes.push([...bytes])}}]}]);
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>device}}});
+ try{await connectBlePrinter();const bytes=new Uint8Array(20001).fill(65);const {elapsed}=await withTransportClock(()=>sendBleBytes(bytes));assert.ok(elapsed>40000);assert.deepEqual(writes.flat(),[...bytes]);assert.equal(bleAvailable(),true);}finally{await disconnectBlePrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+
+test('perda da reserva aborta BLE após primeiro bloco sem repetir nem enviar os seguintes',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),controller=new AbortController(),profile=BLE_PROFILES[0];let writes=0;
+ const device=mockBleDevice([{uuid:profile.service,getCharacteristics:async()=>[{uuid:profile.characteristic,properties:{write:true},writeValueWithResponse:async()=>{writes++;controller.abort()}}]}]);
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>device}}});
+ try{await connectBlePrinter();await assert.rejects(printKitchenReceipt('revoked','x'.repeat(100),controller.signal),/Envio BLE interrompido/);assert.equal(writes,1);assert.equal(bleAvailable(),false);}finally{await disconnectBlePrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+
+test('timeout BLE mantém trava até escrita antiga assentar e evento atrasado preserva reconexão',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),realSetTimeout=globalThis.setTimeout,profile=BLE_PROFILES[0];let release,writes=0,stalled=true;
+ const device=mockBleDevice([{uuid:profile.service,getCharacteristics:async()=>[{uuid:profile.characteristic,properties:{write:true},writeValueWithResponse:async()=>{writes++;if(stalled)await new Promise(resolve=>{release=resolve})}}]}]);
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{bluetooth:{requestDevice:async()=>device}}});
+ globalThis.setTimeout=(callback,delay,...args)=>realSetTimeout(callback,delay===40000?1:delay,...args);
+ try{
+  await connectBlePrinter();await assert.rejects(printKitchenReceipt('old','x'.repeat(100)),/Envio BLE interrompido/);assert.equal(writes,1);assert.equal(bleAvailable(),false);
+  await connectBlePrinter();device.listeners.forEach(callback=>callback());assert.equal(bleAvailable(),true);
+  await assert.rejects(printKitchenReceipt('new','Novo'),/Outra comanda/);assert.equal(writes,1);
+  stalled=false;release();await new Promise(resolve=>realSetTimeout(resolve,0));assert.equal(bleAvailable(),true);assert.equal(writes,1);
+  await printKitchenReceipt('new','Novo');assert.ok(writes>1);assert.equal(bleAvailable(),true);
+ }finally{release?.();globalThis.setTimeout=realSetTimeout;await disconnectBlePrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+import {claimLocalJob,finishLocalJob,touchLocalJob} from '../lib/local-print-queue.ts';
 import {escposBytes,printerPlatform,printerConnectionError,connectKitchenPrinter,disconnectKitchenPrinter,printerAvailable} from '../lib/kitchen-printer.ts';
 test('Bluetooth reserva global impede duas cozinhas de enviar a mesma comanda',()=>{
  const jobs=fixture();const since='2000-01-01T00:00:00Z';
@@ -73,9 +137,31 @@ test('timeout serial interrompe blocos posteriores e fecha a porta após a escri
   await connectKitchenPrinter(false);
   await assert.rejects(printKitchenReceipt('slow','x'.repeat(500)),/Envio interrompido/);
   assert.equal(printerAvailable(),false);assert.equal(writes,1);assert.equal(stream.locked,true);
+  await assert.rejects(printKitchenReceipt('too-soon','Outra comanda'),/Outra comanda/);assert.equal(writes,1);
   release();await new Promise(resolve=>realSetTimeout(resolve,70));
   assert.equal(writes,1);assert.equal(stream.locked,false);assert.equal(closed,1);
  }finally{release?.();globalThis.setTimeout=realSetTimeout;if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator}
+});
+
+test('comanda serial longa completa sem timeout total enquanto cada escrita progride',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),writes=[];
+ const stream=new WritableStream({write(bytes){writes.push([...bytes])}}),p={writable:stream,open:async()=>{},close:async()=>{},addEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{requestPort:async()=>p}}});
+ try{await connectKitchenPrinter(false);const text='x'.repeat(180000),{elapsed}=await withTransportClock(()=>printKitchenReceipt('long',text));assert.ok(elapsed>40000);assert.deepEqual(writes.flat(),[...escposBytes(text)]);assert.equal(printerAvailable(),true);}finally{await disconnectKitchenPrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+
+test('perda da reserva aborta serial após primeiro bloco e libera a conexão antiga',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),controller=new AbortController();let writes=0,closed=0;
+ const stream=new WritableStream({write(){writes++;controller.abort()}}),p={writable:stream,open:async()=>{},close:async()=>{closed++},addEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{requestPort:async()=>p}}});
+ try{await connectKitchenPrinter(false);await assert.rejects(printKitchenReceipt('revoked','x'.repeat(500),controller.signal),/Envio interrompido/);await Promise.resolve();assert.equal(writes,1);assert.equal(printerAvailable(),false);assert.equal(stream.locked,false);assert.equal(closed,1);}finally{await disconnectKitchenPrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
+});
+
+test('evento serial atrasado da sessão antiga não remove a porta reconectada',async()=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator'),listeners=[];
+ const p={writable:new WritableStream({write(){}}),open:async()=>{},close:async()=>{},addEventListener:(event,callback)=>{listeners.push(callback)}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{serial:{requestPort:async()=>p}}});
+ try{await connectKitchenPrinter(false);await disconnectKitchenPrinter();await connectKitchenPrinter(false);listeners[0]();assert.equal(printerAvailable(),true);await printKitchenReceipt('new','Novo');}finally{await disconnectKitchenPrinter();if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;}
 });
 
 test('falha serial libera e fecha a conexão antiga antes de nova tentativa',async()=>{
@@ -150,7 +236,7 @@ function printApiHarness(initial,role='waiter',employeeId='employee-a'){
   '@/lib/saas-billing':{assertSubscription:()=>{}},
   '@/lib/access':{resolveAccess:async()=>({owner:'venue',role,employeeId:role==='owner'?null:employeeId})},
   '@/lib/db':{readVenue:async()=>({state:structuredClone(state),version}),saveVenue:async(_owner,v,next)=>{if(conflicts){conflicts--;return false}if(v!==version)return false;state=next;version++;return true}},
-  '@/lib/print-hub':{registerHub,touchHub,releaseHub,requestHubPrint,hubJobs},'@/lib/local-print-queue':{claimLocalJob,finishLocalJob},'@/lib/print-access':{printScope,copyPrintJob},zod:{z}
+  '@/lib/print-hub':{registerHub,touchHub,releaseHub,requestHubPrint,hubJobs},'@/lib/local-print-queue':{claimLocalJob,finishLocalJob,touchLocalJob},'@/lib/print-access':{printScope,copyPrintJob},zod:{z}
  };
  new Function('require','exports',code)(name=>{if(!deps[name])throw Error(name);return deps[name]},exports);
  return {state:()=>state,replaceState:next=>{state=structuredClone(next);version++},conflict:()=>{conflicts=1},call:async(body)=>{const r=await exports.POST(new Request('https://test.local/api/local-print',{method:'POST',headers:{origin:'https://test.local','Content-Type':'application/json'},body:JSON.stringify({deviceId:'phone',claimToken:'claim',since:'2000-01-01T00:00:00Z',...body})}));return {status:r.status,...await r.json()}}};
@@ -228,4 +314,12 @@ test('liberação atrasada da sessão anterior não remove a central retomada',a
  assert.equal(api.state().printer.hub.deviceId,'new-session');
  assert.equal((await api.call({type:'heartbeat',hub:true,deviceId:'old-session'})).status,400);
  assert.equal((await api.call({type:'heartbeat',hub:true,deviceId:'new-session'})).status,200);
+});
+
+test('API renova apenas reserva privada ativa e respeita funcionário revogado',async()=>{
+ const s=orderFor(portableFixture(),'long','employee-a');s.employees=[{id:'employee-a',name:'Ana',role:'waiter',active:true}];
+ const api=printApiHarness(s);assert.equal((await api.call({type:'claim',jobId:'long'})).status,200);
+ const renewal=await api.call({type:'touch',jobId:'long'});assert.equal(renewal.status,200);assert.equal(renewal.renewed,true);assert.ok(api.state().printJobs[0].claimHeartbeatAt);
+ assert.equal((await api.call({type:'touch',jobId:'long',claimToken:'wrong'})).status,400);
+ const revoked=structuredClone(api.state());revoked.employees[0].active=false;api.replaceState(revoked);assert.equal((await api.call({type:'touch',jobId:'long'})).status,400);
 });

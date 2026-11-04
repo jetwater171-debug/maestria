@@ -2,6 +2,8 @@
 
 Revisão de 28/10/2026. Este roteiro separa implementação, verificação automatizada e validação de operação real.
 
+Atualização de 04/11/2026: o proprietário confirmou TC-163 individual, sem adaptador, e descartou RawBT. A interface oferece conexão direta e Open ESC/POS como alternativa manual no Android. `/impressora` reúne configuração/teste, e `/admin` ganhou fila detalhada por funcionário, diagnósticos voluntários e atendimentos internos auditados. A impressão física no iPhone permanece sem homologação. A pesquisa vigente está em `printing-research-2026-11.md`.
+
 | Etapa | Entrega e critério de aceite | Estado |
 | --- | --- | --- |
 | 1. Impressão portátil | Cada garçom usa seu celular e sua própria TC-163; conectar, conferir teste, enviar pedido e verificar papel. Sem duplicação após erro ou reconexão. | Transporte Serial/BLE, fila e diagnóstico implementados; falta homologação física Android e iPhone. |

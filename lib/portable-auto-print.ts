@@ -1,10 +1,11 @@
+import {withPrintLease} from './print-lease.ts';
 import type {State} from './domain.ts';
 import type {PrintJob} from './printing.ts';
 import {printerAvailable,printKitchenReceipt} from './kitchen-printer.ts';
 import {printerTestConfirmed} from './printer-events.ts';
 
 export type PortablePrintResult={id:string;status:'sent'|'unavailable'|'uncertain'|'skipped'|'failed';message:string};
-type Dependencies={ready:()=>boolean;write:(id:string,content:string)=>Promise<void>;fetcher:typeof fetch};
+type Dependencies={ready:()=>boolean;write:(id:string,content:string,signal?:AbortSignal)=>Promise<void>;fetcher:typeof fetch};
 export function createPortableAutoPrinter(deps:Dependencies){
  let tail:Promise<unknown>=Promise.resolve();
  const pending=new Map<string,Promise<PortablePrintResult>>();
@@ -26,7 +27,7 @@ export function createPortableAutoPrinter(deps:Dependencies){
    catch{return result('failed','Pedido salvo, mas o envio à impressora não foi confirmado. Confira a fila antes de tentar outra via.')}
    if(!reserved)return result('skipped','Comanda em andamento ou já enviada. Confira a fila e o papel.');
    let success=false;
-   try{if(!deps.ready())throw Error('Impressora desconectada.');await deps.write(reserved.id,reserved.content);success=true}catch{/* Never retry a possibly partial write. */}
+   try{if(!deps.ready())throw Error('Impressora desconectada.');await withPrintLease(signal=>deps.write(reserved!.id,reserved!.content,signal),()=>request({type:'touch',jobId:reserved!.id}));success=true}catch{/* Never retry a possibly partial write. */}
    try{await request({type:'finish',jobId:reserved.id,success})}catch{return result('uncertain','Pedido salvo. A confirmação do envio se perdeu. Confira o papel antes de imprimir outra via.')}
    return success?result('sent','Comanda enviada à impressora. Confira o papel e leve à cozinha.'):result('uncertain','Pedido salvo, mas a impressão foi interrompida. Confira o papel antes de repetir.');
   }
